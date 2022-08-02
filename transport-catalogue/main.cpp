@@ -10,19 +10,19 @@ using namespace json;
 using namespace domain;
 using namespace tcatalogue;
 
-bool WorkStop(const json::Dict & m, STOP & stop) {
-    assert(m.at("type").AsString() == "Stop");
+bool WorkStop(const json::Dict & dict, STOP & stop) {
+    assert(dict.at("type").AsString() == "Stop");
     //"type": "Stop",
     //"name": "Ривьерский мост",
     //"latitude": 43.587795,
     //"longitude": 39.716901,
     //"road_distances": {"Морской вокзал": 850}
     try {
-        stop.stop_name_       = m.at("name").AsString();
-        stop.coordinates_.lat = m.at("latitude").AsDouble();
-        stop.coordinates_.lng = m.at("longitude").AsDouble();
+        stop.stop_name_       = dict.at("name").AsString();
+        stop.coordinates_.lat = dict.at("latitude").AsDouble();
+        stop.coordinates_.lng = dict.at("longitude").AsDouble();
         stop.distances_.clear();
-        for (const auto & [k, v] : m.at("road_distances").AsMap()) {
+        for (const auto & [k, v] : dict.at("road_distances").AsMap()) {
             stop.distances_.push_back(std::make_pair(k, v.AsInt()));
         }
     } catch(...) {
@@ -31,17 +31,17 @@ bool WorkStop(const json::Dict & m, STOP & stop) {
     return true;
 }
 
-bool WorkBus(const json::Dict & m, BUS & bus) {
-    assert(m.at("type").AsString() == "Bus");
+bool WorkBus(const json::Dict & dict, BUS & bus) {
+    assert(dict.at("type").AsString() == "Bus");
     //"type": "Bus",
     //"name": "114",
     //"stops": ["Морской вокзал", "Ривьерский мост"],
     //"is_roundtrip": false
     try {
-        bus.bus_id_        = m.at("name").AsString();
-        bus.is_round_trip_ = m.at("is_roundtrip").AsBool();
+        bus.bus_id_        = dict.at("name").AsString();
+        bus.is_round_trip_ = dict.at("is_roundtrip").AsBool();
         bus.stops_.clear();
-        for (const auto & stop : m.at("stops").AsArray()) {
+        for (const auto & stop : dict.at("stops").AsArray()) {
             bus.stops_.push_back(stop.AsString());
         }
     } catch(...) {
@@ -105,7 +105,7 @@ struct STAT_REQUEST {
     std::string name_;
 };
 
-std::list<STAT_REQUEST> WorkStatRequests(TransportCatalogue & db, const json::Array & arr_stat_requests) {
+std::list<STAT_REQUEST> WorkStatRequests(const json::Array & arr_stat_requests) {
     std::list<STAT_REQUEST> requests;
     for (auto & node : arr_stat_requests) {
         if (!node.IsMap()) continue;
@@ -122,7 +122,7 @@ std::list<STAT_REQUEST> WorkStatRequests(TransportCatalogue & db, const json::Ar
 void FillBusResponse(const TransportCatalogue & db, const STAT_REQUEST & request, json::Dict & out_dict) {
     auto bus = db.GetBus(request.name_);
     if (bus.stops.empty()) {
-        out_dict["error_message"] = "not found";
+        out_dict["error_message"] = std::string("not found");
     } else {
         size_t stops_on_route = (bus.is_round_trip
              ? bus.stops.size()
@@ -140,7 +140,7 @@ void FillBusResponse(const TransportCatalogue & db, const STAT_REQUEST & request
 void FillStopResponse(const TransportCatalogue & db, const STAT_REQUEST & request, json::Dict & out_dict) {
     auto opt_stop_busses = db.GetStopBuses(request.name_);
     if (opt_stop_busses.has_value() == false) {
-        out_dict["error_message"] = "not found";
+        out_dict["error_message"] = std::string("not found");
     } else {
         const auto & stop_busses = opt_stop_busses.value().get();
         json::Array arr_busses;
@@ -176,7 +176,7 @@ int main() {
         if (doc->GetRoot().IsMap()) {
             const auto & m = doc->GetRoot().AsMap();
             WorkBaseRequests(db, m.at("base_requests").AsArray());
-            stat_requests = WorkStatRequests(db, m.at("stat_requests").AsArray());
+            stat_requests = WorkStatRequests(m.at("stat_requests").AsArray());
         }
     }
 
@@ -184,7 +184,7 @@ int main() {
         json::Array array;
         for (const STAT_REQUEST & request : (*stat_requests)) {
             json::Dict dictionary;
-            dictionary["id"] = request.id_;
+            dictionary["request_id"] = request.id_;
             if (request.type_ == "Bus") {
                 FillBusResponse(db, request, dictionary);
             } else if (request.type_ == "Stop") {
