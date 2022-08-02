@@ -17,7 +17,7 @@ TransportCatalogue::~TransportCatalogue() {
     stops_.clear();
 }
 
-void TransportCatalogue::AddStop(std::string name, Coordinates coordinates) {
+void TransportCatalogue::AddStop(std::string name, geo::Coordinates coordinates) {
 	auto it = stops_.find(name);
 	if (it == stops_.end()) {
         Stop* current_stop = new Stop{ move(name), move(coordinates) };

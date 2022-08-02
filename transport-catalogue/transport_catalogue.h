@@ -14,7 +14,7 @@ namespace tcatalogue {
 
 struct Stop {
     std::string name;
-    Coordinates coordinates;
+    geo::Coordinates coordinates;
 };
 
 using BusId = std::string;
@@ -38,7 +38,7 @@ public:
     TransportCatalogue(TransportCatalogue &&) = delete;
     TransportCatalogue& operator=(TransportCatalogue &&) = delete;
 
-    void AddStop(std::string name, Coordinates coordinates);
+    void AddStop(std::string name, geo::Coordinates coordinates);
     void AddBus(BusId id, const StopsList & stops, bool is_ring_root);
 
     const Bus& GetBus(BusId id) const;

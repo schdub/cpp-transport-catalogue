@@ -62,7 +62,7 @@ StringList split(std::string_view s, const std::string & delimiter) {
 
 namespace parse {
 
-bool Stop(const std::string & line, std::string & stop_name, Coordinates & coordinates, std::list<std::pair<std::string, size_t>> & lengths) {
+bool Stop(const std::string & line, std::string & stop_name, geo::Coordinates & coordinates, std::list<std::pair<std::string, size_t>> & lengths) {
     stop_name.clear();
     lengths.clear();
     auto str_name_and_lat = detail::split(line, ", ");
@@ -127,7 +127,7 @@ void InputReader(std::istream & input, TransportCatalogue & db) {
         }
         if (code == "Stop") {
             std::string name;
-            Coordinates coordinates;
+            geo::Coordinates coordinates;
             std::list<std::pair<std::string, size_t>> lengths;
             if (parse::Stop(line, name, coordinates, lengths)) {
                 db.AddStop(name, coordinates);
