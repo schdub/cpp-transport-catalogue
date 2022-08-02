@@ -31,6 +31,12 @@ struct Stop {
     geo::Coordinates coordinates;
 };
 
+struct STOP {
+    std::string stop_name_;
+    geo::Coordinates coordinates_;
+    std::list<std::pair<std::string, size_t>> distances_;
+};
+
 using BusId = std::string;
 struct Bus {
     BusId id;
@@ -40,6 +46,12 @@ struct Bus {
 
 using StopsList = std::list<std::string>;
 using StopBusesOpt = std::optional<std::reference_wrapper<const std::unordered_set<Bus*>>>;
+
+struct BUS {
+    BusId bus_id_;
+    StopsList stops_;
+    bool is_round_trip_;
+};
 
 std::pair<double, double> CalculateRouteLength(const tcatalogue::TransportCatalogue & db, const Bus & bus);
 

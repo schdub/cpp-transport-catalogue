@@ -4,15 +4,11 @@
 #include <cassert>
 #include <queue>
 
+#include "domain.h"
+
 using namespace json;
 using namespace domain;
 using namespace tcatalogue;
-
-struct STOP {
-    std::string stop_name_;
-    geo::Coordinates coordinates_;
-    std::list<std::pair<std::string, size_t>> distances_;
-};
 
 bool WorkStop(const json::Dict & m, STOP & stop) {
     assert(m.at("type").AsString() == "Stop");
@@ -34,12 +30,6 @@ bool WorkStop(const json::Dict & m, STOP & stop) {
     }
     return true;
 }
-
-struct BUS {
-    BusId bus_id_;
-    StopsList stops_;
-    bool is_round_trip_;
-};
 
 bool WorkBus(const json::Dict & m, BUS & bus) {
     assert(m.at("type").AsString() == "Bus");

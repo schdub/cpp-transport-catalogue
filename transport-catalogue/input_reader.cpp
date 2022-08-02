@@ -15,49 +15,46 @@ namespace tcatalogue {
 
 namespace parse {
 
-bool Stop(const std::string & line, std::string & stop_name, geo::Coordinates & coordinates, std::list<std::pair<std::string, size_t>> & lengths) {
-    stop_name.clear();
-    lengths.clear();
+bool Stop(const std::string & line, STOP & stop) {
+    stop.stop_name_.clear();
+    stop.distances_.clear();
     auto str_name_and_lat = split(line, ", ");
     if (str_name_and_lat.size() >= 2) {
         auto & s = str_name_and_lat[0];
         auto index = s.find(':');
         if (index != std::string::npos) {
-            stop_name = s.substr(1, index - 1);
-            coordinates.lat = std::stod( std::string{ trim(s.substr(index + 1)) } );
-            coordinates.lng = std::stod( std::string{ trim(str_name_and_lat[1]) } );
+            stop.stop_name_       = s.substr(1, index - 1);
+            stop.coordinates_.lat = std::stod( std::string{ trim(s.substr(index + 1)) } );
+            stop.coordinates_.lng = std::stod( std::string{ trim(str_name_and_lat[1]) } );
             // 3900m to Marushkino
             for (size_t i = 2; i < str_name_and_lat.size(); ++i) {
                 auto str_meters_and_name = split(str_name_and_lat[i], "m to ");
                 assert(str_meters_and_name.size() == 2);
                 std::string other_stop_name{str_meters_and_name[1]};
                 size_t meters = std::stoi( std::string{str_meters_and_name[0]} );
-                lengths.push_back(std::pair(other_stop_name, meters));
+                stop.distances_.push_back(std::pair(other_stop_name, meters));
             }
         }
     }
-    return !stop_name.empty();
+    return !(stop.stop_name_.empty());
 }
 
-bool Bus(std::string_view line,
-         domain::BusId & bus_id,
-         domain::StopsList & stops,
-         bool & is_ring_root) {
+bool Bus(std::string_view line, BUS & bus) {
     // bus_id
     size_t index_begin = line.find_first_not_of(" \t");
     if (index_begin != std::string::npos) {
         size_t index_end = line.find_first_of(":");
         if (index_end != std::string::npos) {
-            bus_id = std::string{line.substr(index_begin, index_end - index_begin)};
+            bus.bus_id_ = std::string{line.substr(index_begin, index_end - index_begin)};
             // delemiter
             index_begin = line.find_first_of("->", index_end + 1);
             // parse root
             // " > " - кольцевой A > B > C > D == A B C D A
             // " - " - обычный A - B - C - D == A B C D C B A
-            is_ring_root = (line[index_begin] == '>');
-            StringList sl = split(line.substr(index_end + 2), is_ring_root ? " > " : " - ");
-            stops = std::list<std::string>( sl.begin(), sl.end() );
-            return stops.size() != 0;
+            bus.is_round_trip_ = (line[index_begin] == '>');
+            StringList sl = split(line.substr(index_end + 2), bus.is_round_trip_ ? " > " : " - ");
+            bus.stops_ = std::list<std::string>( sl.begin(), sl.end() );
+            return bus.stops_.size() != 0;
         }
     }
     return false;
@@ -82,15 +79,13 @@ void InputReader(std::istream & input, TransportCatalogue & db) {
             break;
         }
         if (code == "Stop") {
-            std::string name;
-            geo::Coordinates coordinates;
-            std::list<std::pair<std::string, size_t>> lengths;
-            if (parse::Stop(line, name, coordinates, lengths)) {
-                db.AddStop(name, coordinates);
-                if (lengths.size() == 0) {
+            STOP stop;
+            if (parse::Stop(line, stop)) {
+                db.AddStop(stop.stop_name_, stop.coordinates_);
+                if (stop.distances_.size() == 0) {
                     // WARN() << __FUNCTION__ << name << " is empty" << std::endl;
                 } else {
-                    lengths_for_stop[name] = std::move(lengths);
+                    lengths_for_stop[stop.stop_name_] = std::move(stop.distances_);
                 }
             }
         } else if (code == "Bus") {
@@ -101,24 +96,22 @@ void InputReader(std::istream & input, TransportCatalogue & db) {
     }
     // process pending bus information
     while (pending_busses.empty() == false) {
-        domain::BusId bus_id;
-        domain::StopsList stops;
-        bool is_ring_root;
-        std::string line = pending_busses.front();
-        if (parse::Bus(line, bus_id, stops, is_ring_root)) {
-            db.AddBus(bus_id, stops, is_ring_root);
+        BUS bus;
+        const std::string & line = pending_busses.front();
+        if (parse::Bus(line, bus)) {
+            db.AddBus(bus.bus_id_, bus.stops_, bus.is_round_trip_);
         }
         pending_busses.pop();
     }
     // process pending lenghts between stops information
     for (auto & [stop_name, lenghts] : lengths_for_stop) {
-        const domain::Stop* pstopA = db.GetStop(stop_name);
+        const Stop* pstopA = db.GetStop(stop_name);
         if (pstopA == nullptr) {
             // WARN() << __FUNCTION__ << " [A] '" << stop_name << "' not found." << std::endl;
             continue;
         }
         for (auto & [other_stop_name, meters] : lenghts) {
-            const domain::Stop* pstopB = db.GetStop(other_stop_name);
+            const Stop* pstopB = db.GetStop(other_stop_name);
             if (pstopB == nullptr) {
                 // WARN() << __FUNCTION__ << " [B] '" << other_stop_name << "' not found." << std::endl;
                 continue;
