@@ -9,23 +9,9 @@
 #include <optional>
 
 #include "geo.h"
+#include "domain.h"
 
 namespace tcatalogue {
-
-struct Stop {
-    std::string name;
-    geo::Coordinates coordinates;
-};
-
-using BusId = std::string;
-struct Bus {
-    BusId id;
-    bool is_ring_root;
-    std::vector<Stop*> stops;
-};
-
-using StopsList = std::list<std::string>;
-using StopBusesOpt = std::optional<std::reference_wrapper<const std::unordered_set<Bus*>>>;
 
 class TransportCatalogue {
 public:
@@ -39,23 +25,23 @@ public:
     TransportCatalogue& operator=(TransportCatalogue &&) = delete;
 
     void AddStop(std::string name, geo::Coordinates coordinates);
-    void AddBus(BusId id, const StopsList & stops, bool is_ring_root);
+    void AddBus(domain::BusId id, const domain::StopsList & stops, bool is_ring_root);
 
-    const Bus& GetBus(BusId id) const;
+    const domain::Bus& GetBus(domain::BusId id) const;
 
-    Stop* GetStop(const std::string & stop_name) const;
+    domain::Stop* GetStop(const std::string & stop_name) const;
 
-    StopBusesOpt GetStopBuses(std::string_view stop_name) const;
+    domain::StopBusesOpt GetStopBuses(std::string_view stop_name) const;
 
-    void SetDistanceBetween(const Stop* stopA, const Stop* stopB, size_t value);
-    size_t GetDistanceBetween(const Stop* stopA, const Stop* stopB) const;
+    void SetDistanceBetween(const domain::Stop* stopA, const domain::Stop* stopB, size_t value);
+    size_t GetDistanceBetween(const domain::Stop* stopA, const domain::Stop* stopB) const;
 
 private:
-    std::unordered_map<std::string_view, Stop*> stops_;
-    std::unordered_map<std::string_view, Bus*> buses_;
-    std::unordered_map<std::string_view, std::unordered_set<Bus*>> stop_to_buses_;
+    std::unordered_map<std::string_view, domain::Stop*> stops_;
+    std::unordered_map<std::string_view, domain::Bus*> buses_;
+    std::unordered_map<std::string_view, std::unordered_set<domain::Bus*>> stop_to_buses_;
 
-    using DistanceBetweenKey = std::pair<const Stop*, const Stop*>;
+    using DistanceBetweenKey = std::pair<const domain::Stop*, const domain::Stop*>;
     struct DistanceBetweenHash {
         std::size_t operator()(const DistanceBetweenKey & p) const noexcept;
     };

@@ -2,21 +2,9 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include "domain.h"
 
-namespace detail {
-    void replace(
-        std::string & s,
-        const std::string & a,
-        const std::string & b,
-        size_t begin = 0
-    ) {
-        for (size_t idx = begin ;; idx += b.length()) {
-            idx = s.find(a, idx);
-            if (idx == std::string::npos) break;
-            s.replace(idx, a.length(), b);
-        }
-    }
-}
+using namespace domain;
 
 namespace svg {
 
@@ -141,7 +129,7 @@ Text& Text::SetData(std::string data) {
     };
     assert(from.size() == to.size());
     for (size_t i = 0; i < from.size(); ++i) {
-        detail::replace(data, from[i], to[i]);
+        domain::replace(data, from[i], to[i]);
     }
     data_ = std::move(data);
     return *this;

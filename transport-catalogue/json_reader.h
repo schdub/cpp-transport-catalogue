@@ -1,6 +1,12 @@
 #pragma once
 
-/*
- * Здесь можно разместить код наполнения транспортного справочника данными из JSON,
- * а также код обработки запросов к базе и формирование массива ответов в формате JSON
- */
+#include <iosfwd>
+#include <optional>
+
+#include "json.h"
+
+namespace tcatalogue {
+
+std::optional<json::Document> JsonReader(std::istream & input);
+
+} // namespace tcatalogue

@@ -9,7 +9,6 @@
 namespace json {
 
 class Node;
-// Сохраните объявления Dict и Array без изменения
 using Dict = std::map<std::string, Node>;
 using Array = std::vector<Node>;
 
@@ -21,8 +20,6 @@ public:
 
 class Node {
 public:
-   /* Реализуйте Node, используя std::variant */
-
     Node() = default;
 
     Node(nullptr_t);

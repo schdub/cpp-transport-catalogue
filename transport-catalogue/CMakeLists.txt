@@ -18,4 +18,5 @@ add_executable(sprint10
     request_handler.cpp
     svg.cpp
     json.cpp
+    json_reader.cpp
 )

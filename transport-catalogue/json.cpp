@@ -1,23 +1,9 @@
 #include "json.h"
+#include "domain.h"
 #include <stack>
 
 using namespace std;
-
-namespace detail {
-    template<typename T>
-    void replace(
-        std::string & s,
-        const T & a,
-        const T & b,
-        size_t begin = 0
-    ) {
-        for (size_t idx = begin ;; idx += b.length()) {
-            idx = s.find(a, idx);
-            if (idx == std::string::npos) break;
-            s.replace(idx, a.length(), b);
-        }
-    }
-}
+using namespace domain;
 
 namespace json {
 
@@ -401,11 +387,11 @@ void PrintValue(const std::string & value, std::ostream& out) {
     // \n, \r, \", \t,
     // "\r\n\t\"\\"
     // \"\\r\\n\t\\\"\\\\\"
-    detail::replace(str, "\\"s, "\\\\"s);
-    detail::replace(str, "\""s, "\\\""s);
-    detail::replace(str, "\r"s, "\\r"s);
-    detail::replace(str, "\n"s, "\\n"s);
-    //detail::replace(str, "\t"s, "\\t"s);
+    replace(str, "\\"s, "\\\\"s);
+    replace(str, "\""s, "\\\""s);
+    replace(str, "\r"s, "\\r"s);
+    replace(str, "\n"s, "\\n"s);
+    //replace(str, "\t"s, "\\t"s);
     out << "\"" << str << "\"";
 }
 

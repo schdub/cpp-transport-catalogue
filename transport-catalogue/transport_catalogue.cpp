@@ -1,8 +1,10 @@
 #include "transport_catalogue.h"
 #include <functional>
 #include <cassert>
+#include "domain.h"
 
 using namespace std;
+using namespace domain;
 
 namespace tcatalogue {
 
@@ -29,16 +31,16 @@ void TransportCatalogue::AddStop(std::string name, geo::Coordinates coordinates)
 	}
 }
 
-void TransportCatalogue::AddBus(BusId id, const StopsList & stops, bool is_ring_root) {
+void TransportCatalogue::AddBus(BusId id, const StopsList & stops, bool is_round_trip) {
     Bus* current_bus = nullptr;
     auto it = buses_.find(id);
     if (it == buses_.end()) {
-        current_bus = new Bus{ std::move(id), is_ring_root, {} };
+        current_bus = new Bus{ std::move(id), is_round_trip, {} };
         buses_[current_bus->id] = current_bus;
     } else {
         current_bus = it->second;
         assert(current_bus);
-        current_bus->is_ring_root = is_ring_root;
+        current_bus->is_round_trip = is_round_trip;
     }
     // build stops list
     current_bus->stops.clear();

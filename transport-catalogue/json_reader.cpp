@@ -1,6 +1,21 @@
 #include "json_reader.h"
+#include "transport_catalogue.h"
+#include "json.h"
 
-/*
- * Здесь можно разместить код наполнения транспортного справочника данными из JSON,
- * а также код обработки запросов к базе и формирование массива ответов в формате JSON
- */
+#include <iostream>
+
+using namespace json;
+
+namespace tcatalogue {
+
+std::optional<Document> JsonReader(std::istream & input) {
+    std::optional<Document> doc;
+    try {
+        doc = Load(input);
+    } catch(...) {
+        // WARN() << "can't load json from stream";
+    }
+    return doc;
+}
+
+} // namespace tcatalogue
