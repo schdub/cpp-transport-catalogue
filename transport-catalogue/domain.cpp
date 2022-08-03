@@ -6,6 +6,92 @@ using namespace tcatalogue;
 
 namespace domain {
 
+// заполняем транспортную базу информацией из массивов stops и buses.
+void FillDatabase(tcatalogue::TransportCatalogue & db, const STOPS & stops, const BUSES & buses) {
+    using LenghtsList = std::list<std::pair<std::string, size_t>>;
+    std::unordered_map<std::string, LenghtsList> lengths_for_stop;
+    for (auto & stop : stops) {
+        db.AddStop(stop.stop_name_, stop.coordinates_);
+        if (stop.distances_.size() == 0) {
+            // WARN() << __FUNCTION__ << name << " is empty" << std::endl;
+        } else {
+            lengths_for_stop[stop.stop_name_] = std::move(stop.distances_);
+        }
+    }
+    // process bus information
+    for (const BUS & bus : buses) {
+        db.AddBus(bus.bus_id_, bus.stops_, bus.is_round_trip_);
+    }
+    // process distances between stops information
+    for (auto & [stop_name, lenghts] : lengths_for_stop) {
+        const Stop* pstopA = db.GetStop(stop_name);
+        if (pstopA == nullptr) {
+            // WARN() << __FUNCTION__ << " [A] '" << stop_name << "' not found." << std::endl;
+            continue;
+        }
+        for (auto & [other_stop_name, meters] : lenghts) {
+            const Stop* pstopB = db.GetStop(other_stop_name);
+            if (pstopB == nullptr) {
+                // WARN() << __FUNCTION__ << " [B] '" << other_stop_name << "' not found." << std::endl;
+                continue;
+            }
+            db.SetDistanceBetween(pstopA, pstopB, meters);
+        }
+    }
+}
+
+// заполняем отклики на STAT запросы
+void FillStatResponses(const tcatalogue::TransportCatalogue & db,
+                       const STAT_REQUESTS & requests,
+                       STAT_RESPONSES & responses) {
+    responses.clear();
+    const std::string err_not_found("not found");
+    for (const STAT_REQUEST & req : requests) {
+        if (req.type_ == "Stop") {
+            auto opt_stop_busses = db.GetStopBuses(req.name_);
+            if (opt_stop_busses.has_value() == false) {
+                responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
+            } else {
+                STAT_RESP_STOP resp;
+                resp.request_id = req.id_;
+                const auto & stop_busses = opt_stop_busses.value().get();
+                if (stop_busses.size() != 0) {
+                    std::vector<std::string_view> vector_stops;
+                    vector_stops.reserve(stop_busses.size());
+                    for (auto * pbus : stop_busses) {
+                        vector_stops.push_back(pbus->id);
+                    }
+                    std::sort(vector_stops.begin(), vector_stops.end());
+                    for (const auto & bus_id : vector_stops) {
+                        resp.buses.push_back( std::string(bus_id) );
+                    }
+                }
+                responses.emplace_back( resp );
+            }
+        } else if (req.type_ == "Bus"){
+            auto bus = db.GetBus(req.name_);
+            if (bus.stops.empty()) {
+                responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
+            } else {
+                STAT_RESP_BUS resp;
+                resp.request_id = req.id_;
+                size_t stops_on_route = (bus.is_round_trip
+                     ? bus.stops.size()
+                     : (bus.stops.size() * 2) - 1);
+                size_t unique_stops = UniqueStopsCount(bus);
+                std::pair<double, double> route_length = CalculateRouteLength(db, bus);
+                double curvature = route_length.second / route_length.first;
+                resp.curvature         = curvature;
+                resp.route_length      = static_cast<int>(route_length.second);
+                resp.stop_count        = static_cast<int>(stops_on_route);
+                resp.unique_stop_count = static_cast<int>(unique_stops);
+                responses.emplace_back(resp);
+            }
+        }
+    }
+}
+
+// расчитываем географическую и актуальную дистанцию для маршрута, указанного автобуса.
 std::pair<double, double> CalculateRouteLength(const TransportCatalogue & db, const Bus & bus) {
     double geographical = 0.0;
     double actual = 0.0;
@@ -31,6 +117,7 @@ std::pair<double, double> CalculateRouteLength(const TransportCatalogue & db, co
     return std::make_pair(geographical, actual);
 }
 
+// подсчитываем уникальные остановки.
 size_t UniqueStopsCount(const Bus & bus) {
     std::unordered_set<Stop*> set(bus.stops.begin(), bus.stops.end());
     return set.size();

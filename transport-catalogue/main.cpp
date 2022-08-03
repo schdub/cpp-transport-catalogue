@@ -1,8 +1,8 @@
 #include <iostream>
 #include "transport_catalogue.h"
 #include "json_reader.h"
+#include "request_handler.h"
 #include <cassert>
-#include <queue>
 
 #include "domain.h"
 
@@ -10,188 +10,59 @@ using namespace json;
 using namespace domain;
 using namespace tcatalogue;
 
-bool WorkStop(const json::Dict & dict, STOP & stop) {
-    assert(dict.at("type").AsString() == "Stop");
-    //"type": "Stop",
-    //"name": "Ривьерский мост",
-    //"latitude": 43.587795,
-    //"longitude": 39.716901,
-    //"road_distances": {"Морской вокзал": 850}
-    try {
-        stop.stop_name_       = dict.at("name").AsString();
-        stop.coordinates_.lat = dict.at("latitude").AsDouble();
-        stop.coordinates_.lng = dict.at("longitude").AsDouble();
-        stop.distances_.clear();
-        for (const auto & [k, v] : dict.at("road_distances").AsMap()) {
-            stop.distances_.push_back(std::make_pair(k, v.AsInt()));
-        }
-    } catch(...) {
-        return false;
-    }
-    return true;
+void FillStatResponse(const RESP_ERROR & resp, json::Dict & out_dict) {
+    out_dict["request_id"]    = resp.request_id;
+    out_dict["error_message"] = resp.error_message;
 }
 
-bool WorkBus(const json::Dict & dict, BUS & bus) {
-    assert(dict.at("type").AsString() == "Bus");
-    //"type": "Bus",
-    //"name": "114",
-    //"stops": ["Морской вокзал", "Ривьерский мост"],
-    //"is_roundtrip": false
-    try {
-        bus.bus_id_        = dict.at("name").AsString();
-        bus.is_round_trip_ = dict.at("is_roundtrip").AsBool();
-        bus.stops_.clear();
-        for (const auto & stop : dict.at("stops").AsArray()) {
-            bus.stops_.push_back(stop.AsString());
-        }
-    } catch(...) {
-        return false;
-    }
-    return bus.stops_.size() != 0;
+void FillStatResponse(const STAT_RESP_BUS & resp, json::Dict & out_dict) {
+    out_dict["request_id"]        = resp.request_id;
+    out_dict["curvature"]         = resp.curvature;
+    out_dict["route_length"]      = resp.route_length;
+    out_dict["stop_count"]        = resp.stop_count;
+    out_dict["unique_stop_count"] = resp.unique_stop_count;
 }
 
-void WorkBaseRequests(TransportCatalogue & db, const json::Array & arr_base_requests) {
-    std::queue<BUS> pending_busses;
-    using LenghtsList = std::list<std::pair<std::string, size_t>>;
-    std::unordered_map<std::string, LenghtsList> lengths_for_stop;
-    for (auto & node : arr_base_requests) {
-        if (!node.IsMap()) continue;
-        const auto & m = node.AsMap();
-        if (m.at("type").AsString() == "Bus") {
-            BUS bus;
-            if (WorkBus(m, bus)) {
-                pending_busses.push(bus);
-            }
-        } else if (m.at("type").AsString() == "Stop") {
-            STOP stop;
-            if (WorkStop(m, stop)) {
-                db.AddStop(stop.stop_name_, stop.coordinates_);
-                if (stop.distances_.size() == 0) {
-                    // WARN() << __FUNCTION__ << name << " is empty" << std::endl;
-                } else {
-                    lengths_for_stop[stop.stop_name_] = std::move(stop.distances_);
-                }
-            }
-        }
+void FillStatResponse(const STAT_RESP_STOP & resp, json::Dict & out_dict) {
+    out_dict["request_id"] = resp.request_id;
+    json::Array arr_buses;
+    for (const auto & bus_name : resp.buses) {
+        arr_buses.emplace_back( std::string(bus_name) );
     }
-    // process pending bus information
-    while (pending_busses.empty() == false) {
-        const BUS & bus = pending_busses.front();
-        db.AddBus(bus.bus_id_, bus.stops_, bus.is_round_trip_);
-        pending_busses.pop();
-    }
-    // process pending lenghts between stops information
-    for (auto & [stop_name, lenghts] : lengths_for_stop) {
-        const Stop* pstopA = db.GetStop(stop_name);
-        if (pstopA == nullptr) {
-            // WARN() << __FUNCTION__ << " [A] '" << stop_name << "' not found." << std::endl;
-            continue;
-        }
-        for (auto & [other_stop_name, meters] : lenghts) {
-            const Stop* pstopB = db.GetStop(other_stop_name);
-            if (pstopB == nullptr) {
-                // WARN() << __FUNCTION__ << " [B] '" << other_stop_name << "' not found." << std::endl;
-                continue;
-            }
-            db.SetDistanceBetween(pstopA, pstopB, meters);
-        }
-    }
-}
-
-// { "id": 1, "type": "Stop", "name": "Ривьерский мост" },
-struct STAT_REQUEST {
-    int id_;
-    std::string type_;
-    std::string name_;
-};
-
-std::list<STAT_REQUEST> WorkStatRequests(const json::Array & arr_stat_requests) {
-    std::list<STAT_REQUEST> requests;
-    for (auto & node : arr_stat_requests) {
-        if (!node.IsMap()) continue;
-        const auto & m = node.AsMap();
-        STAT_REQUEST req;
-        req.id_   = m.at("id").AsInt();
-        req.type_ = m.at("type").AsString();
-        req.name_ = m.at("name").AsString();
-        requests.push_back(req);
-    }
-    return requests;
-}
-
-void FillBusResponse(const TransportCatalogue & db, const STAT_REQUEST & request, json::Dict & out_dict) {
-    auto bus = db.GetBus(request.name_);
-    if (bus.stops.empty()) {
-        out_dict["error_message"] = std::string("not found");
-    } else {
-        size_t stops_on_route = (bus.is_round_trip
-             ? bus.stops.size()
-             : (bus.stops.size() * 2) - 1);
-        size_t unique_stops = UniqueStopsCount(bus);
-        std::pair<double, double> route_length = CalculateRouteLength(db, bus);
-        double curvature = route_length.second / route_length.first;
-        out_dict["curvature"]         = curvature;
-        out_dict["route_length"]      = static_cast<int>(route_length.second);
-        out_dict["stop_count"]        = static_cast<int>(stops_on_route);
-        out_dict["unique_stop_count"] = static_cast<int>(unique_stops);
-    }
-}
-
-void FillStopResponse(const TransportCatalogue & db, const STAT_REQUEST & request, json::Dict & out_dict) {
-    auto opt_stop_busses = db.GetStopBuses(request.name_);
-    if (opt_stop_busses.has_value() == false) {
-        out_dict["error_message"] = std::string("not found");
-    } else {
-        const auto & stop_busses = opt_stop_busses.value().get();
-        json::Array arr_busses;
-        if (stop_busses.size() != 0) {
-            std::vector<std::string_view> vector_stops;
-            vector_stops.reserve(stop_busses.size());
-            for (auto * pbus : stop_busses) {
-                vector_stops.push_back(pbus->id);
-            }
-            std::sort(vector_stops.begin(), vector_stops.end());
-            for (const auto & bus_id : vector_stops) {
-                arr_busses.push_back( std::string(bus_id) );
-            }
-        }
-        out_dict["buses"] = arr_busses;
-    }
+    out_dict["buses"] = std::move(arr_buses);
 }
 
 int main() {
-    /*
-     * Примерная структура программы:
-     *
-     * Считать JSON из stdin
-     * Построить на его основе JSON базу данных транспортного справочника
-     * Выполнить запросы к справочнику, находящиеся в массиве "stat_requests", построив JSON-массив
-     * с ответами.
-     * Вывести в stdout ответы в виде JSON
-     */
-    std::optional<json::Document> doc = JsonReader(std::cin);
-    std::optional<std::list<STAT_REQUEST>> stat_requests;
-    TransportCatalogue db;
-    if (doc) {
-        if (doc->GetRoot().IsMap()) {
-            const auto & m = doc->GetRoot().AsMap();
-            WorkBaseRequests(db, m.at("base_requests").AsArray());
-            stat_requests = WorkStatRequests(m.at("stat_requests").AsArray());
+    JsonReader reader(std::cin);
+    if (!reader.IsOk()) {
+        return EXIT_FAILURE;
+    }
+
+    TransportCatalogue db; {
+        STOPS stops;
+        BUSES buses;
+        reader.ParseInput(stops, buses);
+        FillDatabase(db, stops, buses);
+    }
+
+    STAT_RESPONSES responses; {
+        STAT_REQUESTS stat_requests;
+        reader.ParseStatRequests(stat_requests);
+        if (!stat_requests.empty()) {
+            FillStatResponses(db, stat_requests, responses);
         }
     }
 
-    if (stat_requests) {
+    if (!responses.empty()) {
         json::Array array;
-        for (const STAT_REQUEST & request : (*stat_requests)) {
+        for (const STAT_RESPONSE & resp : responses) {
             json::Dict dictionary;
-            dictionary["request_id"] = request.id_;
-            if (request.type_ == "Bus") {
-                FillBusResponse(db, request, dictionary);
-            } else if (request.type_ == "Stop") {
-                FillStopResponse(db, request, dictionary);
-            }
+            std::visit([&dictionary](const auto & stat_response) {
+                FillStatResponse(stat_response, dictionary);
+            }, resp);
             array.emplace_back(dictionary);
         }
         json::Print(json::Document(array), std::cout);
     }
+    return EXIT_SUCCESS;
 }

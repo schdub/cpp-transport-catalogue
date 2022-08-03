@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <optional>
 #include <functional>
+#include <variant>
 #include "geo.h"
 
 namespace tcatalogue {
@@ -24,6 +25,7 @@ struct STOP {
     geo::Coordinates coordinates_;
     std::list<std::pair<std::string, size_t>> distances_;
 };
+using STOPS = std::list<STOP>;
 
 using BusId = std::string;
 struct Bus {
@@ -40,6 +42,37 @@ struct BUS {
     StopsList stops_;
     bool is_round_trip_;
 };
+using BUSES = std::list<BUS>;
+
+void FillDatabase(tcatalogue::TransportCatalogue & db,  const STOPS & stops, const BUSES & buses);
+
+// { "id": 1, "type": "Stop", "name": "Ривьерский мост" },
+struct STAT_REQUEST {
+    int id_;
+    std::string type_;
+    std::string name_;
+};
+using STAT_REQUESTS = std::list<STAT_REQUEST>;
+
+struct RESP_ERROR {
+    int request_id;
+    std::string error_message;
+};
+struct STAT_RESP_BUS {
+    int request_id;
+    double curvature;
+    int route_length;
+    int stop_count;
+    int unique_stop_count;
+};
+struct STAT_RESP_STOP {
+    int request_id;
+    std::vector<std::string> buses;
+};
+
+using STAT_RESPONSE = std::variant<RESP_ERROR, STAT_RESP_BUS, STAT_RESP_STOP>;
+using STAT_RESPONSES = std::list<STAT_RESPONSE>;
+void FillStatResponses(const tcatalogue::TransportCatalogue & db, const STAT_REQUESTS & requests, STAT_RESPONSES & responses);
 
 std::pair<double, double> CalculateRouteLength(const tcatalogue::TransportCatalogue & db, const Bus & bus);
 
