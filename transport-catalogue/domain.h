@@ -27,7 +27,7 @@ struct STOP {
 };
 using STOPS = std::list<STOP>;
 
-using BusId = std::string;
+using BusId = std::string_view;
 struct Bus {
     BusId id;
     bool is_round_trip;

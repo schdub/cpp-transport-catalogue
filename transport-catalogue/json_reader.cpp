@@ -7,6 +7,7 @@
 
 using namespace json;
 using namespace domain;
+using namespace renderer;
 
 namespace tcatalogue {
 
@@ -107,6 +108,60 @@ void JsonReader::ParseStatRequests(STAT_REQUESTS & requests) {
         req.name_ = m.at("name").AsString();
         requests.emplace_back(std::move(req));
     }
+}
+
+svg::Color FromJsonColor(const json::Array & arr) {
+    if (arr.size() == 3) {
+        return svg::Rgb(static_cast<int>(arr[0].AsInt()),
+                static_cast<int>(arr[1].AsInt()),
+                static_cast<int>(arr[2].AsInt()));
+    } else if (arr.size() == 4) {
+        return svg::Rgba(static_cast<int>(arr[0].AsInt()),
+                static_cast<int>(arr[1].AsInt()),
+                static_cast<int>(arr[2].AsInt()),
+                arr[3].AsDouble());
+    }
+    assert(!"this shouldn't happen!");
+    return svg::Color{};
+}
+
+svg::Point FromJsonPoint(const json::Array & arr) {
+    assert(arr.size() >= 2);
+    svg::Point result;
+    result.x = arr[0].AsDouble();
+    result.y = arr[1].AsDouble();
+    return result;
+}
+
+renderer::Settings FromJsonSettings(const json::Dict & dict) {
+    Settings result;
+    result.width = dict.at("width").AsDouble();
+    result.height = dict.at("height").AsDouble();
+    result.padding = dict.at("padding").AsDouble();
+    result.stop_radius = dict.at("stop_radius").AsDouble();
+    result.line_width = dict.at("line_width").AsDouble();
+    result.bus_label_font_size = dict.at("bus_label_font_size").AsDouble();
+    result.bus_label_offset = FromJsonPoint( dict.at("bus_label_offset").AsArray());
+    result.stop_label_font_size = dict.at("stop_label_font_size").AsDouble();
+    result.stop_label_offset = FromJsonPoint(dict.at("stop_label_offset").AsArray());
+    result.underlayer_color = FromJsonColor(dict.at("underlayer_color").AsArray());
+    result.underlayer_width = dict.at("underlayer_width").AsDouble();
+    for (auto & item : dict.at("color_palette").AsArray()) {
+        if (item.IsArray()) {
+            result.color_palette.emplace_back(FromJsonColor(item.AsArray()));
+        } else if (item.IsString()) {
+            result.color_palette.emplace_back(svg::Color(item.AsString()));
+        }
+    }
+    return result;
+}
+
+std::optional<renderer::Settings> JsonReader::ParseRenderSettings() {
+    if (!doc_->GetRoot().IsMap()) {
+        return std::nullopt;
+    }
+    const auto & m = doc_->GetRoot().AsMap();
+    return FromJsonSettings(m.at("render_settings").AsMap());
 }
 
 } // namespace tcatalogue

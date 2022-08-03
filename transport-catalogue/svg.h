@@ -6,52 +6,39 @@
 #include <string>
 #include <list>
 #include <optional>
+#include <variant>
 
 namespace svg {
 
-using Color = std::string;
-
-// Объявив в заголовочном файле константу со спецификатором inline,
-// мы сделаем так, что она будет одной на все единицы трансляции,
-// которые подключают этот заголовок.
-// В противном случае каждая единица трансляции будет использовать свою копию этой константы
-inline const Color NoneColor{"none"};
-
-template <typename Owner>
-class PathProps {
-    std::optional<Color> fill_color_;
-    std::optional<Color> stroke_color_;
-
-    Owner& AsOwner() {
-        // static_cast безопасно преобразует *this к Owner&,
-        // если класс Owner — наследник PathProps
-        return static_cast<Owner&>(*this);
-    }
-
-public:
-    Owner& SetFillColor(Color color) {
-        fill_color_ = std::move(color);
-        return AsOwner();
-    }
-    Owner& SetStrokeColor(Color color) {
-        stroke_color_ = std::move(color);
-        return AsOwner();
-    }
-
-protected:
-    ~PathProps() = default;
-
-    void RenderAttrs(std::ostream& out) const {
-        using namespace std::literals;
-
-        if (fill_color_) {
-            out << " fill=\""sv << *fill_color_ << "\""sv;
-        }
-        if (stroke_color_) {
-            out << " stroke=\""sv << *stroke_color_ << "\""sv;
-        }
-    }
+struct Rgb {
+    uint8_t red{};
+    uint8_t green{};
+    uint8_t blue{};
+    Rgb() = default;
+    Rgb(uint8_t red, uint8_t green, uint8_t blue)
+        : red(red)
+        , green(green)
+        , blue(blue)
+    {}
 };
+
+struct Rgba {
+    uint8_t red{};
+    uint8_t green{};
+    uint8_t blue{};
+    double opacity{1.0};
+    Rgba() = default;
+    Rgba(uint8_t red, uint8_t green, uint8_t blue, double opacity)
+        : red(red)
+        , green(green)
+        , blue(blue)
+        , opacity(opacity)
+    {}
+};
+
+using Color = std::variant<std::monostate, Rgb, Rgba, std::string>;
+std::ostream& operator<< (std::ostream& out, const Color &);
+inline const Color NoneColor{"none"};
 
 enum class StrokeLineCap {
     BUTT,
@@ -71,7 +58,9 @@ std::ostream& operator<< (std::ostream& out, const StrokeLineCap & line_cap);
 std::ostream& operator<< (std::ostream& out, const StrokeLineJoin & line_cap);
 
 template <typename Owner>
-class StrokeProps {
+class PathProps {
+    std::optional<Color> fill_color_;
+    std::optional<Color> stroke_color_;
     std::optional<double> stroke_width_;
     std::optional<StrokeLineCap> stroke_linecap_;
     std::optional<StrokeLineJoin> stroke_linejoin_;
@@ -83,6 +72,14 @@ class StrokeProps {
     }
 
 public:
+    Owner& SetFillColor(Color color) {
+        fill_color_ = std::move(color);
+        return AsOwner();
+    }
+    Owner& SetStrokeColor(Color color) {
+        stroke_color_ = std::move(color);
+        return AsOwner();
+    }
     Owner& SetStrokeWidth(double stroke_width) {
         stroke_width_ = std::move(stroke_width);
         return AsOwner();
@@ -97,11 +94,17 @@ public:
     }
 
 protected:
-    ~StrokeProps() = default;
+    ~PathProps() = default;
 
-    void RenderStrokeAttrs(std::ostream& out) const {
+    void RenderAttrs(std::ostream& out) const {
         using namespace std::literals;
 
+        if (fill_color_) {
+            out << " fill=\""sv << *fill_color_ << "\""sv;
+        }
+        if (stroke_color_) {
+            out << " stroke=\""sv << *stroke_color_ << "\""sv;
+        }
         if (stroke_width_) {
             out << " stroke-width=\""sv << *stroke_width_ << "\""sv;
         }
@@ -173,7 +176,7 @@ private:
  * Класс Circle моделирует элемент <circle> для отображения круга
  * https://developer.mozilla.org/en-US/docs/Web/SVG/Element/circle
  */
-class Circle final : public Object, public PathProps<Circle>, public StrokeProps<Circle> {
+class Circle final : public Object, public PathProps<Circle> {
     Point center_;
     double radius_ = 1.0;
     void RenderObject(const RenderContext& context) const override;
@@ -186,7 +189,7 @@ public:
  * Класс Polyline моделирует элемент <polyline> для отображения ломаных линий
  * https://developer.mozilla.org/en-US/docs/Web/SVG/Element/polyline
  */
-class Polyline final : public Object, public PathProps<Polyline>, public StrokeProps<Polyline> {
+class Polyline final : public Object, public PathProps<Polyline> {
     std::list<Point> points_;
     void RenderObject(const RenderContext& context) const override;
 public:
@@ -198,7 +201,7 @@ public:
  * Класс Text моделирует элемент <text> для отображения текста
  * https://developer.mozilla.org/en-US/docs/Web/SVG/Element/text
  */
-class Text final : public Object, public PathProps<Text>, public StrokeProps<Text> {
+class Text final : public Object, public PathProps<Text> {
     Point pos_{0, 0};
     Point offset_{0, 0};
     uint32_t font_size_ = 1;
@@ -235,6 +238,11 @@ public:
     }
     virtual void AddPtr(std::unique_ptr<Object>&& pobj) = 0;
     virtual ~ObjectContainer() {}
+    ObjectContainer() = default;
+    ObjectContainer(const ObjectContainer&) = default;
+    ObjectContainer& operator=(const ObjectContainer&) = default;
+    ObjectContainer(ObjectContainer&&) = default;
+    ObjectContainer& operator=(ObjectContainer&&) = default;
 };
 
 class Drawable {
@@ -246,6 +254,10 @@ public:
 class Document : public ObjectContainer {
 public:
     Document() = default;
+    Document(const Document&) = default;
+    Document& operator=(const Document&) = default;
+    Document(Document&&) = default;
+    Document& operator=(Document&&) = default;
 
     /*
      Метод Add добавляет в svg-документ любой объект-наследник svg::Object.

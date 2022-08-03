@@ -2,9 +2,21 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include "domain.h"
 
-using namespace domain;
+namespace detail {
+    void replace(
+        std::string & s,
+        const std::string & a,
+        const std::string & b,
+        size_t begin = 0
+    ) {
+        for (size_t idx = begin ;; idx += b.length()) {
+            idx = s.find(a, idx);
+            if (idx == std::string::npos) break;
+            s.replace(idx, a.length(), b);
+        }
+    }
+}
 
 namespace svg {
 
@@ -19,14 +31,48 @@ std::ostream& operator<<(std::ostream& out, const StrokeLineCap & line_cap) {
     return out;
 }
 
-std::ostream& operator<<(std::ostream& out, const StrokeLineJoin & line_cap) {
-    switch (line_cap) {
+std::ostream& operator<<(std::ostream& out, const StrokeLineJoin & line_join) {
+    switch (line_join) {
     case       StrokeLineJoin::ARCS: out << "arcs";       break;
     case      StrokeLineJoin::BEVEL: out << "bevel";      break;
     case      StrokeLineJoin::MITER: out << "miter";      break;
     case StrokeLineJoin::MITER_CLIP: out << "miter-clip"; break;
     case      StrokeLineJoin::ROUND: out << "round";      break;
     }
+    return out;
+}
+
+std::ostream& operator<< (std::ostream& out, const Rgb & color) {
+    out << "rgb(" << static_cast<int>(color.red) << ","
+                  << static_cast<int>(color.green) << ","
+                  << static_cast<int>(color.blue) << ")";
+    return out;
+}
+
+std::ostream& operator<< (std::ostream& out, const Rgba & color) {
+    out << "rgba(" << static_cast<int>(color.red) << ","
+                   << static_cast<int>(color.green) << ","
+                   << static_cast<int>(color.blue) << ","
+                   << color.opacity << ")";
+    return out;
+}
+
+
+class ColorPrinter {
+    std::ostream& out_;
+public:
+    ColorPrinter(std::ostream & out)
+        : out_(out)
+    {}
+    void operator()(std::monostate) const { out_ << NoneColor; }
+    void operator()(const Rgb & color) const  { out_ << color; }
+    void operator()(const Rgba & color) const { out_ << color; }
+    void operator()(const std::string & color) const { out_ << color; }
+};
+
+
+std::ostream& operator<< (std::ostream& out, const Color & color) {
+    std::visit(ColorPrinter(out), color);
     return out;
 }
 
@@ -56,7 +102,6 @@ void Circle::RenderObject(const RenderContext& context) const {
     out << "<circle cx=\""sv << center_.x << "\" cy=\""sv << center_.y << "\" "sv;
     out << "r=\""sv << radius_ << "\""sv;
     RenderAttrs(out);
-    RenderStrokeAttrs(out);
     out << " />"sv;
 }
 
@@ -84,7 +129,6 @@ void Polyline::RenderObject(const RenderContext& context) const {
     }
     out << "\"";
     RenderAttrs(out);
-    RenderStrokeAttrs(out);
     out << " />";
 }
 
@@ -129,7 +173,7 @@ Text& Text::SetData(std::string data) {
     };
     assert(from.size() == to.size());
     for (size_t i = 0; i < from.size(); ++i) {
-        domain::replace(data, from[i], to[i]);
+        detail::replace(data, from[i], to[i]);
     }
     data_ = std::move(data);
     return *this;
@@ -156,7 +200,6 @@ void Text::RenderObject(const RenderContext& context) const {
     out << " font-weight=\"" << font_weight_ << "\"";
     // attributes
     RenderAttrs(out);
-    RenderStrokeAttrs(out);
     // data_
     out << ">" << data_ << "</text>";
 }

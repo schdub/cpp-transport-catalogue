@@ -37,6 +37,7 @@ void TransportCatalogue::AddBus(BusId id, const StopsList & stops, bool is_round
     if (it == buses_.end()) {
         current_bus = new Bus{ std::move(id), is_round_trip, {} };
         buses_[current_bus->id] = current_bus;
+        bus_ids_.insert(current_bus->id);
     } else {
         current_bus = it->second;
         assert(current_bus);
@@ -62,6 +63,14 @@ const Bus& TransportCatalogue::GetBus(BusId id) const {
         return empty_bus_information;
     }
     return *(it->second);
+}
+
+const domain::Bus* TransportCatalogue::GetBusPtr(domain::BusId id) const {
+    auto it = buses_.find(id);
+    if (it == buses_.end() || it->second == nullptr) {
+        return nullptr;
+    }
+    return (it->second);
 }
 
 Stop* TransportCatalogue::GetStop(const std::string & stop_name) const {
@@ -112,6 +121,14 @@ std::size_t TransportCatalogue::DistanceBetweenHash::operator()(const DistanceBe
     std::size_t h1 = hash_function(p.first);
     std::size_t h2 = hash_function(p.second);;
     return h2 * 37 + h1 ;
+}
+
+std::unordered_set<std::string_view>::const_iterator TransportCatalogue::begin() const {
+    return bus_ids_.begin();
+}
+
+std::unordered_set<std::string_view>::const_iterator TransportCatalogue::end() const {
+    return bus_ids_.end();
 }
 
 } // namespace tcatalogue
