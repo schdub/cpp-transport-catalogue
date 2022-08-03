@@ -9,8 +9,6 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 add_executable(sprint10
     main.cpp
-    input_reader.cpp
-    stat_reader.cpp
     transport_catalogue.cpp
     geo.cpp
     domain.cpp
