@@ -129,7 +129,7 @@ void Polyline::RenderObject(const RenderContext& context) const {
     }
     out << "\"";
     RenderAttrs(out);
-    out << " />";
+    out << "/>";
 }
 
 // ---------- Text ------------------
@@ -184,6 +184,8 @@ void Text::RenderObject(const RenderContext& context) const {
     // if (data_.empty()) return;
     auto & out = context.out;
     out << "<text";
+    // attributes
+    RenderAttrs(out);
     // pos_
     out << " x=\"" << pos_.x << "\"";
     out << " y=\"" << pos_.y << "\"";
@@ -198,8 +200,6 @@ void Text::RenderObject(const RenderContext& context) const {
     // font_weight_
     if (!font_weight_.empty())
     out << " font-weight=\"" << font_weight_ << "\"";
-    // attributes
-    RenderAttrs(out);
     // data_
     out << ">" << data_ << "</text>";
 }

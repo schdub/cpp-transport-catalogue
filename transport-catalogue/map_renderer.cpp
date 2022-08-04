@@ -10,6 +10,10 @@
 #include "geo.h"
 #include "svg.h"
 
+using namespace svg;
+using namespace std;
+using namespace domain;
+
 namespace renderer {
 
 inline const double EPSILON = 1e-6;
@@ -70,7 +74,7 @@ public:
     }
 
     // Проецирует широту и долготу в координаты внутри SVG-изображения
-    svg::Point operator()(geo::Coordinates coords) const {
+    svg::Point operator()(const geo::Coordinates & coords) const {
         return {
             (coords.lng - min_lon_) * zoom_coeff_ + padding_,
             (max_lat_ - coords.lat) * zoom_coeff_ + padding_
@@ -84,36 +88,154 @@ private:
     double zoom_coeff_ = 0;
 };
 
-svg::Document MapRenderer::render(std::list<const domain::Bus*> buses_list) const {
-    // получаем координаты всех остановок
-    std::unordered_map<const domain::Stop*, geo::Coordinates> screen_coords;
+svg::Document MapRenderer::render(std::vector<const domain::Bus*> buses_list) const {
+    // сортируем маршруты по имени
+    std::sort(buses_list.begin(), buses_list.end(), [](const Bus* lhs, const Bus* rhs) {
+        return (lhs->id < rhs->id);
+    });
+    // получаем географические координаты всех остановок
+    std::unordered_map<const domain::Stop*, svg::Point> translated_coords;
     std::vector<geo::Coordinates> flat_coords;
     for (const domain::Bus* pBus : buses_list) {
         for (const domain::Stop * pStop : pBus->stops) {
-            const auto it = screen_coords.find(pStop);
-            if (it != screen_coords.end()) continue;
-            screen_coords[pStop] = pStop->coordinates;
+            const auto it = translated_coords.find(pStop);
+            if (it != translated_coords.end()) continue;
+            translated_coords[pStop] = {};
             flat_coords.push_back(pStop->coordinates);
         }
     }
-    const SphereProjector proj{
+    // создаем проектор
+    const SphereProjector project{
         flat_coords.begin(),
         flat_coords.end(),
         settings_.width,
         settings_.height,
         settings_.padding
     };
-    // Проецируем и выводим координаты
+    // и транслируем из сферических в 2D координаты
+    for (auto & [pStop, points] : translated_coords) {
+        points = std::move(project(pStop->coordinates));
+    }
+
+    // формируем svg документ
     svg::Document svg_doc;
+    size_t current_color_idx = 0;
+    size_t current_color_max = settings_.color_palette.size();
+    assert(current_color_max > 0);
+
+    // выводим линии маршрутов
     for (const domain::Bus* pBus : buses_list) {
-        svg::Polyline polyline;
-        polyline.SetStrokeWidth(settings_.line_width);
+        svg::Polyline rootline;
+        rootline.SetStrokeColor( settings_.color_palette.at(current_color_idx) );
+        rootline.SetStrokeWidth(settings_.line_width);
+        rootline.SetFillColor("none");
+        rootline.SetStrokeLineCap(StrokeLineCap::ROUND);
+        rootline.SetStrokeLineJoin(StrokeLineJoin::ROUND);
+        // дорога "туда"
         for (const domain::Stop * pStop : pBus->stops) {
-            const auto & geo_coord = screen_coords[pStop];
-            const auto & scr_coord = proj(geo_coord);
-            polyline.AddPoint(scr_coord);
+            const auto & scr_coord = translated_coords[pStop];
+            rootline.AddPoint(scr_coord);
         }
-        svg_doc.Add(polyline);
+        // обратная дорога для не кольцевого маршрута
+        if (pBus->is_round_trip == false && pBus->stops.size() > 1) {
+            auto index = pBus->stops.end();
+            index -= 2;
+            for (; index >= pBus->stops.begin(); --index) {
+                const auto & scr_coord = translated_coords[*index];
+                rootline.AddPoint(scr_coord);
+            }
+        }
+        svg_doc.Add(rootline);
+        // выбираем следующий цвет в палитре
+        if (++current_color_idx >= current_color_max) {
+            current_color_idx = 0;
+        }
+    }
+
+    // названия маршрутов
+    current_color_idx = 0;
+    for (const domain::Bus* pBus : buses_list) {
+        svg::Text utext;
+        svg::Text text;
+
+        utext.SetData(std::string(pBus->id));
+        text.SetData(std::string(pBus->id));
+
+        text.SetFillColor(settings_.color_palette.at(current_color_idx));
+        utext.SetFillColor(settings_.underlayer_color)
+             .SetStrokeColor(settings_.underlayer_color)
+             .SetStrokeWidth(settings_.underlayer_width)
+             .SetStrokeLineCap(StrokeLineCap::ROUND)
+             .SetStrokeLineJoin(StrokeLineJoin::ROUND);
+        {
+            const auto & points = translated_coords[ pBus->stops.front() ];
+            text.SetPosition(points)
+                .SetOffset(settings_.bus_label_offset)
+                .SetFontSize(settings_.bus_label_font_size)
+                .SetFontFamily("Verdana")
+                .SetFontWeight("bold");
+            utext.SetPosition(points)
+                .SetOffset(settings_.bus_label_offset)
+                .SetFontSize(settings_.bus_label_font_size)
+                .SetFontFamily("Verdana")
+                .SetFontWeight("bold");
+        }
+
+        if (pBus->is_round_trip) {
+            svg_doc.Add(utext);
+            svg_doc.Add(text);
+        } else {
+            svg_doc.Add(utext);
+            svg_doc.Add(text);
+
+            const auto & points = translated_coords[ pBus->stops.back() ];
+            text.SetPosition(points);
+            utext.SetPosition(points);
+
+            svg_doc.Add(utext);
+            svg_doc.Add(text);
+        }
+
+        // выбираем следующий цвет в палитре
+        if (++current_color_idx >= current_color_max) {
+            current_color_idx = 0;
+        }
+    }
+
+    // кружки остановок
+    {
+        svg::Circle circle;
+        circle.SetFillColor( "white"s )
+              .SetRadius( settings_.stop_radius );
+        for (const auto & [pStop, pts] : translated_coords) {
+            circle.SetCenter( pts );
+            svg_doc.Add(circle);
+        }
+    }
+    // названия остановок
+    {
+        svg::Text utext;
+        svg::Text text;
+        text.SetFillColor("black");
+        utext.SetFillColor(settings_.underlayer_color)
+            .SetStrokeColor(settings_.underlayer_color)
+            .SetStrokeWidth(settings_.underlayer_width)
+            .SetStrokeLineCap(StrokeLineCap::ROUND)
+            .SetStrokeLineJoin(StrokeLineJoin::ROUND);
+        text.SetOffset(settings_.stop_label_offset)
+            .SetFontSize(settings_.stop_label_font_size)
+            .SetFontFamily("Verdana");
+        utext.SetOffset(settings_.stop_label_offset)
+             .SetFontSize(settings_.stop_label_font_size)
+             .SetFontFamily("Verdana");
+        for (const auto & [pStop, pts] : translated_coords) {
+            utext.SetPosition(pts);
+            text.SetPosition(pts);
+            utext.SetData(std::string(pStop->name));
+            text.SetData(std::string(pStop->name));
+            svg_doc.Add(utext);
+            svg_doc.Add(text);
+        }
     }
     return svg_doc;
 }

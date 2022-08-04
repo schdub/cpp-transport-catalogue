@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <sstream>
 
 using namespace json;
 using namespace domain;
@@ -133,26 +134,45 @@ svg::Point FromJsonPoint(const json::Array & arr) {
     return result;
 }
 
+svg::Color FromJsonNodeColor(const json::Node & node) {
+    if (node.IsArray()) {
+        return FromJsonColor(node.AsArray());
+    } else if (node.IsString()) {
+        return svg::Color(node.AsString());
+    }
+    assert(!"FromJsonNodeColor invalid node with color!");
+    return svg::Color{};
+}
+
 renderer::Settings FromJsonSettings(const json::Dict & dict) {
     Settings result;
-    result.width = dict.at("width").AsDouble();
-    result.height = dict.at("height").AsDouble();
-    result.padding = dict.at("padding").AsDouble();
-    result.stop_radius = dict.at("stop_radius").AsDouble();
-    result.line_width = dict.at("line_width").AsDouble();
-    result.bus_label_font_size = dict.at("bus_label_font_size").AsDouble();
-    result.bus_label_offset = FromJsonPoint( dict.at("bus_label_offset").AsArray());
+//    try {
+    result.width                = dict.at("width").AsDouble();
+    result.height               = dict.at("height").AsDouble();
+    result.padding              = dict.at("padding").AsDouble();
+    result.stop_radius          = dict.at("stop_radius").AsDouble();
+    result.line_width           = dict.at("line_width").AsDouble();
+    result.bus_label_font_size  = dict.at("bus_label_font_size").AsDouble();
+    result.bus_label_offset     = FromJsonPoint(dict.at("bus_label_offset").AsArray());
     result.stop_label_font_size = dict.at("stop_label_font_size").AsDouble();
-    result.stop_label_offset = FromJsonPoint(dict.at("stop_label_offset").AsArray());
-    result.underlayer_color = FromJsonColor(dict.at("underlayer_color").AsArray());
-    result.underlayer_width = dict.at("underlayer_width").AsDouble();
+    result.stop_label_offset    = FromJsonPoint(dict.at("stop_label_offset").AsArray());
+    result.underlayer_color     = FromJsonNodeColor(dict.at("underlayer_color"));
+    result.underlayer_width     = dict.at("underlayer_width").AsDouble();
     for (auto & item : dict.at("color_palette").AsArray()) {
         if (item.IsArray()) {
             result.color_palette.emplace_back(FromJsonColor(item.AsArray()));
         } else if (item.IsString()) {
             result.color_palette.emplace_back(svg::Color(item.AsString()));
+        } else {
+            assert(!"can't parse color_palette item!");
         }
     }
+//    } catch(...) {
+//        std::stringstream stream;
+//        json::Print(json::Document(dict), stream);
+//        throw std::logic_error(stream.str());
+//    }
+
     return result;
 }
 

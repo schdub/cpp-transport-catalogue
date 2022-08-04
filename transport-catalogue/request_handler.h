@@ -9,5 +9,5 @@ class RequestHandler {
 public:
     RequestHandler(tcatalogue::TransportCatalogue & db) : db_(db) {}
 
-    std::list<const domain::Bus*> GetAllBuses() const;
+    std::vector<const domain::Bus*> GetAllBuses() const;
 };
