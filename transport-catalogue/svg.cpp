@@ -102,7 +102,7 @@ void Circle::RenderObject(const RenderContext& context) const {
     out << "<circle cx=\""sv << center_.x << "\" cy=\""sv << center_.y << "\" "sv;
     out << "r=\""sv << radius_ << "\""sv;
     RenderAttrs(out);
-    out << " />"sv;
+    out << "/>"sv;
 }
 
 // ---------- Polyline ------------------
