@@ -9,6 +9,8 @@
 #include <variant>
 #include "geo.h"
 
+class RequestHandler;
+
 namespace tcatalogue {
 class TransportCatalogue;
 }
@@ -44,7 +46,7 @@ struct BUS {
 };
 using BUSES = std::list<BUS>;
 
-void FillDatabase(tcatalogue::TransportCatalogue & db,  const STOPS & stops, const BUSES & buses);
+void FillDatabase(tcatalogue::TransportCatalogue & db, const STOPS & stops, const BUSES & buses);
 
 // { "id": 1, "type": "Stop", "name": "Ривьерский мост" },
 struct STAT_REQUEST {
@@ -69,10 +71,14 @@ struct STAT_RESP_STOP {
     int request_id;
     std::vector<std::string> buses;
 };
+struct STAT_RESP_MAP {
+    int request_id;
+    std::string map;
+};
 
-using STAT_RESPONSE = std::variant<RESP_ERROR, STAT_RESP_BUS, STAT_RESP_STOP>;
+using STAT_RESPONSE = std::variant<RESP_ERROR, STAT_RESP_BUS, STAT_RESP_STOP, STAT_RESP_MAP>;
 using STAT_RESPONSES = std::list<STAT_RESPONSE>;
-void FillStatResponses(const tcatalogue::TransportCatalogue & db, const STAT_REQUESTS & requests, STAT_RESPONSES & responses);
+void FillStatResponses(const RequestHandler & handler, const STAT_REQUESTS & requests, STAT_RESPONSES & responses);
 
 std::pair<double, double> CalculateRouteLength(const tcatalogue::TransportCatalogue & db, const Bus & bus);
 

@@ -106,7 +106,9 @@ void JsonReader::ParseStatRequests(STAT_REQUESTS & requests) {
         STAT_REQUEST req;
         req.id_   = m.at("id").AsInt();
         req.type_ = m.at("type").AsString();
-        req.name_ = m.at("name").AsString();
+        if (req.type_ != "Map") {
+            req.name_ = m.at("name").AsString();
+        }
         requests.emplace_back(std::move(req));
     }
 }

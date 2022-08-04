@@ -1,5 +1,6 @@
 #include "domain.h"
 #include "transport_catalogue.h"
+#include "request_handler.h"
 #include <cassert>
 
 using namespace tcatalogue;
@@ -41,14 +42,14 @@ void FillDatabase(tcatalogue::TransportCatalogue & db, const STOPS & stops, cons
 }
 
 // заполняем отклики на STAT запросы
-void FillStatResponses(const tcatalogue::TransportCatalogue & db,
+void FillStatResponses(const RequestHandler & handler,
                        const STAT_REQUESTS & requests,
                        STAT_RESPONSES & responses) {
     responses.clear();
     const std::string err_not_found("not found");
     for (const STAT_REQUEST & req : requests) {
         if (req.type_ == "Stop") {
-            auto opt_stop_busses = db.GetStopBuses(req.name_);
+            auto opt_stop_busses = handler.GetStopBuses(req.name_);
             if (opt_stop_busses.has_value() == false) {
                 responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
             } else {
@@ -69,7 +70,7 @@ void FillStatResponses(const tcatalogue::TransportCatalogue & db,
                 responses.emplace_back( resp );
             }
         } else if (req.type_ == "Bus"){
-            auto bus = db.GetBus(req.name_);
+            auto bus = handler.GetBus(req.name_);
             if (bus.stops.empty()) {
                 responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
             } else {
@@ -79,7 +80,7 @@ void FillStatResponses(const tcatalogue::TransportCatalogue & db,
                      ? bus.stops.size()
                      : (bus.stops.size() * 2) - 1);
                 size_t unique_stops = UniqueStopsCount(bus);
-                std::pair<double, double> route_length = CalculateRouteLength(db, bus);
+                std::pair<double, double> route_length = handler.CalculateRouteLength(bus);
                 double curvature = route_length.second / route_length.first;
                 resp.curvature         = curvature;
                 resp.route_length      = static_cast<int>(route_length.second);
@@ -87,34 +88,13 @@ void FillStatResponses(const tcatalogue::TransportCatalogue & db,
                 resp.unique_stop_count = static_cast<int>(unique_stops);
                 responses.emplace_back(resp);
             }
+        } else if (req.type_ == "Map") {
+            STAT_RESP_MAP resp;
+            resp.request_id = req.id_;
+            resp.map = handler.DrawMap();
+            responses.emplace_back(resp);
         }
     }
-}
-
-// расчитываем географическую и актуальную дистанцию для маршрута, указанного автобуса.
-std::pair<double, double> CalculateRouteLength(const TransportCatalogue & db, const Bus & bus) {
-    double geographical = 0.0;
-    double actual = 0.0;
-    const auto & v = bus.stops;
-    assert(v.size() >= 2);
-    for (size_t i = 0; i + 1 < v.size(); ++i) {
-        const Stop* pStopA = v[i];
-        const Stop* pStopB = v[i+1];
-        double distance = ComputeDistance( pStopA->coordinates, pStopB->coordinates );
-        geographical += distance;
-        size_t meters = db.GetDistanceBetween( pStopA, pStopB );
-        actual += meters;
-    }
-    if (bus.is_round_trip == false) {
-        geographical *= 2;
-        for (size_t i = v.size()-1; i > 0; --i) {
-            const Stop* pStopA = v[i];
-            const Stop* pStopB = v[i-1];
-            size_t meters = db.GetDistanceBetween( pStopA, pStopB );
-            actual += meters;
-        }
-    }
-    return std::make_pair(geographical, actual);
 }
 
 // подсчитываем уникальные остановки.
