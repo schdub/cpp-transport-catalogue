@@ -51,7 +51,7 @@ std::pair<double, double> RequestHandler::CalculateRouteLength(const domain::Bus
 
 std::string RequestHandler::DrawMap() const {
     std::stringstream stream;
-    svg::Document doc = drawer_.render( GetAllBuses() );
+    svg::Document doc = drawer_.Render( GetAllBuses() );
     doc.Render(stream);
     return stream.str();
 }

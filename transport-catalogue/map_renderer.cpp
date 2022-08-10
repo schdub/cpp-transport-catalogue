@@ -88,7 +88,7 @@ private:
     double zoom_coeff_ = 0;
 };
 
-svg::Document MapRenderer::render(std::vector<const domain::Bus*> buses_list) const {
+svg::Document MapRenderer::Render(std::vector<const domain::Bus*> buses_list) const {
     const std::string FONT_FAMILY{"Verdana"};
     const std::string STOP_POINT_COLOR{"white"};
     const std::string STOP_NAME_COLOR{"black"};

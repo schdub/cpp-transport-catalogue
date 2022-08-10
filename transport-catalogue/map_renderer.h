@@ -24,7 +24,7 @@ class MapRenderer {
     const Settings & settings_;
 public:
     MapRenderer(const Settings & settings) : settings_(settings) {}
-    svg::Document render(std::vector<const domain::Bus *> buses_list) const;
+    svg::Document Render(std::vector<const domain::Bus *> buses_list) const;
 };
 
 }
