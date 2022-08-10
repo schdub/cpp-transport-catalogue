@@ -1,9 +1,8 @@
 #include "json.h"
-#include "domain.h"
 #include <stack>
+#include "domain.h"
 
 using namespace std;
-using namespace domain;
 
 namespace json {
 
@@ -246,35 +245,49 @@ Node::Node(nullptr_t)
 {}
 
 Node::Node(Array array)
-    : data_(move(array)) {
-}
+    : data_(move(array))
+{}
 
 Node::Node(Dict map)
-    : data_(move(map)) {
-}
+    : data_(move(map))
+{}
 
 Node::Node(int value)
-    : data_(value) {
-}
+    : data_(value)
+{}
+
+Node::Node(const char* value)
+    : data_(string(value))
+{}
 
 Node::Node(string value)
-    : data_(move(value)) {
-}
+    : data_(move(value))
+{}
 
 Node::Node(double value)
-    : data_(move(value)) {
-}
+    : data_(move(value))
+{}
 
 Node::Node(bool value)
-    : data_(move(value)) {
-}
+    : data_(move(value))
+{}
 
 const Array& Node::AsArray() const {
     if (!IsArray()) throw logic_error("not array");
     return std::get<Array>(data_);
 }
 
+Array& Node::AsArray() {
+    if (!IsArray()) throw logic_error("not array");
+    return std::get<Array>(data_);
+}
+
 const Dict& Node::AsMap() const {
+    if (!IsMap()) throw logic_error("not map");
+    return std::get<Dict>(data_);
+}
+
+Dict& Node::AsMap() {
     if (!IsMap()) throw logic_error("not map");
     return std::get<Dict>(data_);
 }
@@ -387,11 +400,11 @@ void PrintValue(const std::string & value, std::ostream& out) {
     // \n, \r, \", \t,
     // "\r\n\t\"\\"
     // \"\\r\\n\t\\\"\\\\\"
-    replace(str, "\\"s, "\\\\"s);
-    replace(str, "\""s, "\\\""s);
-    replace(str, "\r"s, "\\r"s);
-    replace(str, "\n"s, "\\n"s);
-    //replace(str, "\t"s, "\\t"s);
+    domain::replace(str, "\\"s, "\\\\"s);
+    domain::replace(str, "\""s, "\\\""s);
+    domain::replace(str, "\r"s, "\\r"s);
+    domain::replace(str, "\n"s, "\\n"s);
+    //detail::replace(str, "\t"s, "\\t"s);
     out << "\"" << str << "\"";
 }
 

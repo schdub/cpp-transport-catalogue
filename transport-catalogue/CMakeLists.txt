@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 2.4)
 
-project(sprint10)
+project(sprint11)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++17")
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-add_executable(sprint10
+add_executable(sprint11
     main.cpp
     transport_catalogue.cpp
     geo.cpp
@@ -17,4 +17,5 @@ add_executable(sprint10
     svg.cpp
     json.cpp
     json_reader.cpp
+    json_builder.cpp
 )
