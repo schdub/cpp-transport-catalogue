@@ -65,6 +65,12 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    auto opt_routing_settings = reader.ParseRoutingSettings();
+    if (!opt_routing_settings.has_value()) {
+        // WARN() << "can't parse routing_settings!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
     STAT_RESPONSES responses; {
         STAT_REQUESTS stat_requests;
         reader.ParseStatRequests(stat_requests);

@@ -178,12 +178,34 @@ renderer::Settings FromJsonSettings(const json::Dict & dict) {
     return result;
 }
 
+domain::RoutingSettings FromJsonRouteSettings(const json::Dict & dict) {
+    domain::RoutingSettings result;
+//    try {
+    result.bus_velocity  = dict.at("bus_velocity").AsDouble();
+    result.bus_wait_time = dict.at("bus_wait_time").AsDouble();
+//    } catch(...) {
+//        std::stringstream stream;
+//        json::Print(json::Document(dict), stream);
+//        throw std::logic_error(stream.str());
+//    }
+
+    return result;
+}
+
 std::optional<renderer::Settings> JsonReader::ParseRenderSettings() {
     if (!doc_->GetRoot().IsMap()) {
         return std::nullopt;
     }
     const auto & m = doc_->GetRoot().AsMap();
     return FromJsonSettings(m.at("render_settings").AsMap());
+}
+
+std::optional<domain::RoutingSettings> JsonReader::ParseRoutingSettings() {
+    if (!doc_->GetRoot().IsMap()) {
+        return std::nullopt;
+    }
+    const auto & m = doc_->GetRoot().AsMap();
+    return FromJsonRouteSettings(m.at("routing_settings").AsMap());
 }
 
 } // namespace tcatalogue

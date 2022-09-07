@@ -19,6 +19,7 @@ public:
     void ParseInput(domain::STOPS & stops, domain::BUSES &buses);
     void ParseStatRequests(domain::STAT_REQUESTS & requests);
     std::optional<renderer::Settings> ParseRenderSettings();
+    std::optional<domain::RoutingSettings> ParseRoutingSettings();
 };
 
 } // namespace tcatalogue

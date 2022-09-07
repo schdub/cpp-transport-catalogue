@@ -17,6 +17,11 @@ class TransportCatalogue;
 
 namespace domain {
 
+struct RoutingSettings {
+    double bus_velocity;
+    double bus_wait_time;
+};
+
 struct Stop {
     std::string name;
     geo::Coordinates coordinates;
