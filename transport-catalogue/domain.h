@@ -7,6 +7,7 @@
 #include <optional>
 #include <functional>
 #include <variant>
+#include <map>
 #include "geo.h"
 
 class RequestHandler;
@@ -54,10 +55,91 @@ using BUSES = std::list<BUS>;
 void FillDatabase(tcatalogue::TransportCatalogue & db, const STOPS & stops, const BUSES & buses);
 
 // { "id": 1, "type": "Stop", "name": "Ривьерский мост" },
+
+struct STAT_REQ_BUS {
+    std::string name_;
+};
+struct STAT_REQ_STOP {
+    std::string name_;
+};
+struct STAT_REQ_MAP {
+};
+/*
+  "from": "Biryulyovo Zapadnoye",
+  "id": 4,
+  "to": "Universam",
+  "type": "Route"
+ */
+struct STAT_REQ_ROUTE {
+    std::string from_;
+    std::string to_;
+};
+
+enum class STAT_REQ_TYPE {
+    UNKNOWN = 0,
+    BUS,
+    STOP,
+    MAP,
+    ROUTE,
+};
+using STAT_REQUEST_DATA = std::variant<STAT_REQ_BUS, STAT_REQ_STOP, STAT_REQ_MAP, STAT_REQ_ROUTE>;
 struct STAT_REQUEST {
     int id_;
-    std::string type_;
-    std::string name_;
+    STAT_REQ_TYPE type_;
+    STAT_REQUEST_DATA data_;
+    void SetType(const std::string & str_type) {
+        const static std::map<std::string, STAT_REQ_TYPE> request_types = {
+            { "Bus",   STAT_REQ_TYPE::BUS },
+            { "Stop",  STAT_REQ_TYPE::STOP },
+            { "Map",   STAT_REQ_TYPE::MAP },
+            { "Route", STAT_REQ_TYPE::ROUTE },
+        };
+        auto it = request_types.find(str_type);
+        if (it == request_types.end()) {
+            type_ = STAT_REQ_TYPE::UNKNOWN;
+        } else {
+            type_ = it->second;
+        }
+    }
+
+    bool IsBus() const {
+        return (type_ == STAT_REQ_TYPE::BUS);
+    }
+    bool IsStop() const {
+        return (type_ == STAT_REQ_TYPE::STOP);
+    }
+    bool IsMap() const {
+        return (type_ == STAT_REQ_TYPE::MAP);
+    }
+    bool IsRoute() const {
+        return (type_ == STAT_REQ_TYPE::ROUTE);
+    }
+
+    const STAT_REQ_BUS & Bus() const {
+        return std::get<STAT_REQ_BUS>(data_);
+    }
+    const STAT_REQ_STOP & Stop() const {
+        return std::get<STAT_REQ_STOP>(data_);
+    }
+    const STAT_REQ_MAP & Map() const {
+        return std::get<STAT_REQ_MAP>(data_);
+    }
+    const STAT_REQ_ROUTE & Route() const {
+        return std::get<STAT_REQ_ROUTE>(data_);
+    }
+
+    STAT_REQ_BUS & Bus() {
+        return std::get<STAT_REQ_BUS>(data_);
+    }
+    STAT_REQ_STOP & Stop() {
+        return std::get<STAT_REQ_STOP>(data_);
+    }
+    STAT_REQ_MAP & Map() {
+        return std::get<STAT_REQ_MAP>(data_);
+    }
+    STAT_REQ_ROUTE & Route() {
+        return std::get<STAT_REQ_ROUTE>(data_);
+    }
 };
 using STAT_REQUESTS = std::list<STAT_REQUEST>;
 

@@ -105,9 +105,19 @@ void JsonReader::ParseStatRequests(STAT_REQUESTS & requests) {
         const auto & m = node.AsMap();
         STAT_REQUEST req;
         req.id_   = m.at("id").AsInt();
-        req.type_ = m.at("type").AsString();
-        if (req.type_ != "Map") {
-            req.name_ = m.at("name").AsString();
+        req.SetType(m.at("type").AsString());
+        if (req.IsBus()) {
+            req.Bus().name_ = m.at("name").AsString();
+        } else if (req.IsStop()) {
+            req.Stop().name_ = m.at("name").AsString();
+        } else if (req.IsMap()) {
+            // nothing to parse here
+        } else if (req.IsRoute()) {
+            auto req_route = req.Route();
+            req_route.from_ = m.at("from").AsString();
+            req_route.to_   = m.at("to").AsString();
+        } else {
+            // FIXME: invalid request!
         }
         requests.emplace_back(std::move(req));
     }

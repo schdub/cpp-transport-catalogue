@@ -48,8 +48,8 @@ void FillStatResponses(const RequestHandler & handler,
     responses.clear();
     const std::string err_not_found("not found");
     for (const STAT_REQUEST & req : requests) {
-        if (req.type_ == "Stop") {
-            auto opt_stop_busses = handler.GetStopBuses(req.name_);
+        if (req.IsStop()) {
+            auto opt_stop_busses = handler.GetStopBuses(req.Stop().name_);
             if (opt_stop_busses.has_value() == false) {
                 responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
             } else {
@@ -69,8 +69,8 @@ void FillStatResponses(const RequestHandler & handler,
                 }
                 responses.emplace_back( resp );
             }
-        } else if (req.type_ == "Bus"){
-            auto bus = handler.GetBus(req.name_);
+        } else if (req.IsBus()){
+            auto bus = handler.GetBus(req.Bus().name_);
             if (bus.stops.empty()) {
                 responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
             } else {
@@ -88,11 +88,13 @@ void FillStatResponses(const RequestHandler & handler,
                 resp.unique_stop_count = static_cast<int>(unique_stops);
                 responses.emplace_back(resp);
             }
-        } else if (req.type_ == "Map") {
+        } else if (req.IsMap()) {
             STAT_RESP_MAP resp;
             resp.request_id = req.id_;
             resp.map = handler.DrawMap();
             responses.emplace_back(resp);
+        } else if (req.IsRoute()) {
+
         }
     }
 }
