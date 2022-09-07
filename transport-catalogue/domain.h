@@ -163,7 +163,56 @@ struct STAT_RESP_MAP {
     std::string map;
 };
 
-using STAT_RESPONSE = std::variant<RESP_ERROR, STAT_RESP_BUS, STAT_RESP_STOP, STAT_RESP_MAP>;
+struct STAT_RESP_ROUTE_ITEM_WAIT {
+    std::string stop_name;
+    double time;
+};
+
+struct STAT_RESP_ROUTE_ITEM_BUS {
+    std::string bus;
+    int span_count;
+    double time;
+};
+
+enum class STAT_RESP_ROUTE_ITEM_TYPE {
+    UNKNOWN = 0,
+    WAIT,
+    BUS,
+};
+
+using STAT_RESP_ROUTE_ITEM_DATA = std::variant<STAT_RESP_ROUTE_ITEM_WAIT, STAT_RESP_ROUTE_ITEM_BUS>;
+struct STAT_RESP_ROUTE_ITEM {
+    STAT_RESP_ROUTE_ITEM_TYPE type_;
+    STAT_RESP_ROUTE_ITEM_DATA data_;
+
+    bool IsWait() const {
+        return (type_ == STAT_RESP_ROUTE_ITEM_TYPE::WAIT);
+    }
+    bool IsBus() const {
+        return (type_ == STAT_RESP_ROUTE_ITEM_TYPE::BUS);
+    }
+
+    STAT_RESP_ROUTE_ITEM_WAIT & Wait() {
+        return std::get<STAT_RESP_ROUTE_ITEM_WAIT>(data_);
+    }
+    STAT_RESP_ROUTE_ITEM_BUS & Bus() {
+        return std::get<STAT_RESP_ROUTE_ITEM_BUS>(data_);
+    }
+
+    const STAT_RESP_ROUTE_ITEM_WAIT & Wait() const {
+        return std::get<STAT_RESP_ROUTE_ITEM_WAIT>(data_);
+    }
+    const STAT_RESP_ROUTE_ITEM_BUS & Bus() const {
+        return std::get<STAT_RESP_ROUTE_ITEM_BUS>(data_);
+    }
+};
+struct STAT_RESP_ROUTE {
+    int request_id;
+    double total_time;
+    std::list<STAT_RESP_ROUTE_ITEM> items;
+};
+
+using STAT_RESPONSE = std::variant<RESP_ERROR, STAT_RESP_BUS, STAT_RESP_STOP, STAT_RESP_MAP, STAT_RESP_ROUTE>;
 using STAT_RESPONSES = std::list<STAT_RESPONSE>;
 void FillStatResponses(const RequestHandler & handler, const STAT_REQUESTS & requests, STAT_RESPONSES & responses);
 

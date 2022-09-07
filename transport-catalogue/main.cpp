@@ -46,6 +46,31 @@ void FillStatResponse(const STAT_RESP_MAP & resp, json::Builder & builder) {
         .EndDict();
 }
 
+void FillStatResponse(const STAT_RESP_ROUTE & resp, json::Builder & builder) {
+    builder.StartDict()
+        .Key("request_id").Value(resp.request_id)
+        .Key("total_time").Value(resp.total_time)
+        .Key("items").StartArray();
+    for (const auto & item : resp.items) {
+        auto item_dict = builder.StartDict();
+        if (item.IsWait()) {
+            const auto & wait_item = item.Wait();
+            item_dict.Key("type").Value("Wait");
+            item_dict.Key("stop_name").Value(wait_item.stop_name);
+            item_dict.Key("time").Value(wait_item.time);
+        } else if (item.IsBus()) {
+            const auto & bus_item = item.Bus();
+            item_dict.Key("type").Value("Bus");
+            item_dict.Key("bus").Value(bus_item.bus);
+            item_dict.Key("span_count").Value(bus_item.span_count);
+            item_dict.Key("time").Value(bus_item.time);
+        } else {
+            // FIXME: invalid item type!!!
+        }
+    }
+    builder.EndArray().EndDict();
+}
+
 int main() {
     JsonReader reader(std::cin);
     if (!reader.IsOk()) {
