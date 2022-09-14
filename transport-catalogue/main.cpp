@@ -103,7 +103,7 @@ int main() {
             //LOG() << "stat_requests is empty." << std::endl;
         } else {
             renderer::MapRenderer drawer(opt_renderer_settings.value());
-            RequestHandler handler(db, drawer);
+            RequestHandler handler(db, drawer, opt_routing_settings.value());
             FillStatResponses(handler, stat_requests, responses);
         }
     }

@@ -113,7 +113,7 @@ void JsonReader::ParseStatRequests(STAT_REQUESTS & requests) {
         } else if (req.IsMap()) {
             // nothing to parse here
         } else if (req.IsRoute()) {
-            auto req_route = req.Route();
+            auto & req_route = req.Route();
             req_route.from_ = m.at("from").AsString();
             req_route.to_   = m.at("to").AsString();
         } else {

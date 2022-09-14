@@ -94,11 +94,18 @@ struct STAT_REQUEST {
             { "Map",   STAT_REQ_TYPE::MAP },
             { "Route", STAT_REQ_TYPE::ROUTE },
         };
+        static std::map<STAT_REQ_TYPE, STAT_REQUEST_DATA> datas = {
+            { STAT_REQ_TYPE::BUS, STAT_REQ_BUS{} },
+            { STAT_REQ_TYPE::STOP, STAT_REQ_STOP{} },
+            { STAT_REQ_TYPE::MAP, STAT_REQ_MAP{} },
+            { STAT_REQ_TYPE::ROUTE, STAT_REQ_ROUTE{} },
+        };
         auto it = request_types.find(str_type);
         if (it == request_types.end()) {
             type_ = STAT_REQ_TYPE::UNKNOWN;
         } else {
             type_ = it->second;
+            data_ = datas[type_];
         }
     }
 

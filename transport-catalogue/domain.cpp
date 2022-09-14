@@ -94,7 +94,12 @@ void FillStatResponses(const RequestHandler & handler,
             resp.map = handler.DrawMap();
             responses.emplace_back(resp);
         } else if (req.IsRoute()) {
-
+            STAT_RESP_ROUTE resp;
+            if (!handler.HandleRoute(req.Route(), resp)) {
+                responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
+            } else {
+                responses.emplace_back(resp);
+            }
         }
     }
 }
