@@ -47,12 +47,12 @@ void FillStatResponse(const STAT_RESP_MAP & resp, json::Builder & builder) {
 }
 
 void FillStatResponse(const STAT_RESP_ROUTE & resp, json::Builder & builder) {
-    builder.StartDict()
+    auto array_context = builder.StartDict()
         .Key("request_id").Value(resp.request_id)
         .Key("total_time").Value(resp.total_time)
         .Key("items").StartArray();
     for (const auto & item : resp.items) {
-        auto item_dict = builder.StartDict();
+        auto item_dict = array_context.StartDict();
         if (item.IsWait()) {
             const auto & wait_item = item.Wait();
             item_dict.Key("type").Value("Wait");
@@ -67,6 +67,7 @@ void FillStatResponse(const STAT_RESP_ROUTE & resp, json::Builder & builder) {
         } else {
             // FIXME: invalid item type!!!
         }
+        item_dict.EndDict();
     }
     builder.EndArray().EndDict();
 }

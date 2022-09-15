@@ -13,6 +13,8 @@ using namespace domain;
 
 // //////////////////////////////////////////////////////////// //
 
+const size_t MAX_GRAPH_IDXES = 256;
+
 class RouteGraph {
 public:
     using Ty = double;
@@ -36,12 +38,21 @@ private:
     std::unordered_map<const domain::Stop*, VertexContext*> ctx_by_stop_;
     std::unordered_map<graph::VertexId, VertexContext*> vctx_by_idx_;
 
+    enum class EDGE_TYPE {
+        ed_Unknown,
+        et_Wait,
+        et_Bus,
+    };
+    using EDGE_DATA = std::variant<const domain::Stop*, const domain::Bus* >;
+    std::unordered_map< graph::EdgeId, std::pair<EDGE_TYPE, EDGE_DATA> > et_by_eid_;
+
 public:
     RouteGraph(tcatalogue::TransportCatalogue & db,
-               const domain::RoutingSettings & routing_settings)
+               const domain::RoutingSettings & routing_settings,
+               size_t vertex_count)
         : db_(db)
         , routing_settings_(routing_settings)
-        , graph_(256)
+        , graph_(vertex_count)
     {}
 
     ~RouteGraph() {
@@ -70,18 +81,30 @@ public:
     }
 
     void FillResponse(const ROUTER::RouteInfo & route_info, domain::STAT_RESP_ROUTE & route_response ) {
+//        std::cerr << route_info.weight << std::endl;
+
+        route_response.total_time = 0.0;
+        route_response.items.clear();
 
         for (graph::EdgeId eid : route_info.edges) {
+            const std::pair<EDGE_TYPE, EDGE_DATA> & edge = et_by_eid_[eid];
             const Ed & ed = graph_.GetEdge(eid);
 
-            VertexContext * vctxA = vctx_by_idx_[ed.from];
-            if (vctxA && vctxA->stop_) {
-                std::cerr << "A: " << ed.from << " " << vctxA->stop_->name << std::endl;
-            }
-
-            VertexContext * vctxB = vctx_by_idx_[ed.to];
-            if (vctxB && vctxB->stop_) {
-                std::cerr << "B: " << ed.to << " " << vctxB->stop_->name << std::endl;
+            if (edge.first == EDGE_TYPE::et_Bus) {
+//                std::cerr << " " << pBus->id << " " << ed.weight << std::endl;
+                const domain::Bus* pBus = std::get<const domain::Bus*>(edge.second);
+                STAT_RESP_ROUTE_ITEM_BUS item_bus;
+                item_bus.bus        = pBus->id;
+                item_bus.span_count = 0;
+                item_bus.time       = ed.weight;
+                route_response.items.push_back({STAT_RESP_ROUTE_ITEM_TYPE::BUS, std::move(item_bus)});
+            } else if (edge.first == EDGE_TYPE::et_Wait) {
+//                std::cerr << " waiting " << pStop->name << " " << ed.weight << std::endl;
+                const domain::Stop* pStop = std::get<const domain::Stop*>(edge.second);
+                STAT_RESP_ROUTE_ITEM_WAIT item_wait;
+                item_wait.stop_name = pStop->name;
+                item_wait.time = ed.weight;
+                route_response.items.push_back({STAT_RESP_ROUTE_ITEM_TYPE::WAIT, std::move(item_wait)});
             }
         }
     }
@@ -90,9 +113,16 @@ public:
         return (ptr_router_ != nullptr);
     }
 
+    double DistanceToTime(size_t distance) {
+        //((2600 + 890) / (40. * 5./18.) ) / 60.
+        double result = distance;
+        result /= (routing_settings_.bus_velocity * 5 / 18);
+        result /= 60;
+        return result;
+    }
+
     void Prepare() {
         const double bus_waiting_time = routing_settings_.bus_wait_time;
-        const double bus_speed        = routing_settings_.bus_velocity;
         graph::VertexId current_vertex_id = 0;
 
         // создаем пути
@@ -116,7 +146,8 @@ public:
                 e_waitA.to     = current_vertex_id++;
                 vctxA->idx_by_bus_[pBus] = e_waitA.to;
 
-                graph_.AddEdge(e_waitA);
+                auto wid = graph_.AddEdge(e_waitA);
+                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Wait, pStopA);
 
                 if (i + 1 >= ie) {
                     if (pBus->is_round_trip == false) break;
@@ -135,10 +166,12 @@ public:
                 size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
 
                 Ed e_stopB;
-                e_stopB.weight = distance ; //* bus_speed; // FIXME: proper calculation
+                e_stopB.weight = DistanceToTime(distance);
                 e_stopB.from   = e_waitA.to;
                 e_stopB.to     = vctxB->idx_waiting_;
-                graph_.AddEdge(e_stopB);
+                wid = graph_.AddEdge(e_stopB);
+                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, pBus);
+
             } // for (size_t i = 0)
 
             if (pBus->is_round_trip == false) {
@@ -154,10 +187,11 @@ public:
                     assert(vctxB);
 
                     Ed edge;
-                    edge.weight = distance ;//* bus_speed; // TODO: fix calc!!
+                    edge.weight = DistanceToTime(distance);
                     edge.from   = vctxA->idx_by_bus_[pBus];
                     edge.to     = vctxB->idx_waiting_;
-                    graph_.AddEdge(edge);
+                    auto wid    = graph_.AddEdge(edge);
+                    et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, pBus);
                 }
             } // if (pBus->is_round_trip)
         } // for ( const std::string & bus_id : db_ )
@@ -173,7 +207,7 @@ RequestHandler::RequestHandler(tcatalogue::TransportCatalogue & db,
                                const domain::RoutingSettings & routing_settings)
     : db_(db)
     , drawer_(drawer)
-    , route_graph_(new RouteGraph(db, routing_settings))
+    , route_graph_(new RouteGraph(db, routing_settings, MAX_GRAPH_IDXES))
 {}
 
 const domain::Bus& RequestHandler::GetBus(domain::BusId id) const {
@@ -231,12 +265,12 @@ bool RequestHandler::HandleRoute(const domain::STAT_REQ_ROUTE & route_request,
         route_graph_->Prepare();
     }
 
-    RouteGraph::ROUTER::RouteInfo ri;
-    if (!route_graph_->Build(route_request.from_, route_request.to_, ri)) {
-        return false;
+//    std::cerr << route_request.from_ << " " << route_request.to_ << std::endl;
+
+    RouteGraph::ROUTER::RouteInfo route_info;
+    if (route_graph_->Build(route_request.from_, route_request.to_, route_info)) {
+        route_graph_->FillResponse(route_info, route_response);
+        return true;
     }
-
-    route_graph_->FillResponse(ri, route_response);
-
-    return true;
+    return false;
 }

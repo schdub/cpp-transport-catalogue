@@ -98,6 +98,7 @@ void FillStatResponses(const RequestHandler & handler,
             if (!handler.HandleRoute(req.Route(), resp)) {
                 responses.emplace_back( RESP_ERROR{req.id_, err_not_found} );
             } else {
+                resp.request_id = req.id_;
                 responses.emplace_back(resp);
             }
         }

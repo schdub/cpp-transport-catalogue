@@ -172,13 +172,13 @@ struct STAT_RESP_MAP {
 
 struct STAT_RESP_ROUTE_ITEM_WAIT {
     std::string stop_name;
-    double time;
+    double time = 0.0;
 };
 
 struct STAT_RESP_ROUTE_ITEM_BUS {
     std::string bus;
-    int span_count;
-    double time;
+    int span_count = 0;
+    double time = 0.0;
 };
 
 enum class STAT_RESP_ROUTE_ITEM_TYPE {
@@ -215,7 +215,7 @@ struct STAT_RESP_ROUTE_ITEM {
 };
 struct STAT_RESP_ROUTE {
     int request_id;
-    double total_time;
+    double total_time = 0.0;
     std::list<STAT_RESP_ROUTE_ITEM> items;
 };
 
