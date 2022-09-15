@@ -31,9 +31,8 @@ private:
     std::shared_ptr<ROUTER> ptr_router_;
 
     struct VertexContext {
-        const domain::Stop* stop_ = nullptr;
         graph::VertexId idx_waiting_ = std::numeric_limits<graph::VertexId>::max();
-        std::unordered_map<const domain::Bus*, graph::VertexId> idx_by_bus_;
+        graph::VertexId idx_arrive_ = std::numeric_limits<graph::VertexId>::max();
     };
     std::unordered_map<const domain::Stop*, VertexContext*> ctx_by_stop_;
     std::unordered_map<graph::VertexId, VertexContext*> vctx_by_idx_;
@@ -43,7 +42,11 @@ private:
         et_Wait,
         et_Bus,
     };
-    using EDGE_DATA = std::variant<const domain::Stop*, const domain::Bus* >;
+    struct RidingBus {
+        size_t span_count_ = 0;
+        const domain::Bus* bus_ = nullptr;
+    };
+    using EDGE_DATA = std::variant<const domain::Stop*, RidingBus >;
     std::unordered_map< graph::EdgeId, std::pair<EDGE_TYPE, EDGE_DATA> > et_by_eid_;
 
 public:
@@ -52,6 +55,7 @@ public:
                size_t vertex_count)
         : db_(db)
         , routing_settings_(routing_settings)
+        , current_vertex_id_(0)
         , graph_(vertex_count)
     {}
 
@@ -82,25 +86,23 @@ public:
 
     void FillResponse(const ROUTER::RouteInfo & route_info, domain::STAT_RESP_ROUTE & route_response ) {
 //        std::cerr << route_info.weight << std::endl;
-
-        route_response.total_time = 0.0;
+        route_response.total_time = route_info.weight;
         route_response.items.clear();
-
         for (graph::EdgeId eid : route_info.edges) {
             const std::pair<EDGE_TYPE, EDGE_DATA> & edge = et_by_eid_[eid];
             const Ed & ed = graph_.GetEdge(eid);
-
             if (edge.first == EDGE_TYPE::et_Bus) {
+                RidingBus bus_context = std::get<RidingBus>(edge.second);
+                const domain::Bus * pBus = bus_context.bus_;
 //                std::cerr << " " << pBus->id << " " << ed.weight << std::endl;
-                const domain::Bus* pBus = std::get<const domain::Bus*>(edge.second);
                 STAT_RESP_ROUTE_ITEM_BUS item_bus;
                 item_bus.bus        = pBus->id;
-                item_bus.span_count = 0;
+                item_bus.span_count = bus_context.span_count_;
                 item_bus.time       = ed.weight;
                 route_response.items.push_back({STAT_RESP_ROUTE_ITEM_TYPE::BUS, std::move(item_bus)});
             } else if (edge.first == EDGE_TYPE::et_Wait) {
-//                std::cerr << " waiting " << pStop->name << " " << ed.weight << std::endl;
                 const domain::Stop* pStop = std::get<const domain::Stop*>(edge.second);
+//                std::cerr << " waiting " << pStop->name << " " << ed.weight << std::endl;
                 STAT_RESP_ROUTE_ITEM_WAIT item_wait;
                 item_wait.stop_name = pStop->name;
                 item_wait.time = ed.weight;
@@ -121,83 +123,183 @@ public:
         return result;
     }
 
-    void Prepare() {
-        const double bus_waiting_time = routing_settings_.bus_wait_time;
-        graph::VertexId current_vertex_id = 0;
+    VertexContext * GetContextForStop(const domain::Stop * pStop) {
+        auto it_ctx = ctx_by_stop_.find(pStop);
+        if (it_ctx != ctx_by_stop_.end()) {
+            return it_ctx->second;
+        }
+        VertexContext * result = new VertexContext;
+        ctx_by_stop_[pStop]  = result;
+        result->idx_waiting_ = current_vertex_id_++;
+        result->idx_arrive_  = current_vertex_id_++;
+        vctx_by_idx_[result->idx_waiting_] = result;
+        return result;
+    }
 
-        // создаем пути
+    // создаем кольцевой маршрут
+    void PrepareRouteRing(const domain::Bus * pBus) {
+        assert(pBus);
+        assert(pBus->is_round_trip == true);
+
+        std::vector<double> lengths;
+        for (size_t i = 0, ie = pBus->stops.size() - 1; i < ie; ++i) {
+            const Stop * pStopA = pBus->stops[i];
+            VertexContext * vctxA = GetContextForStop(pStopA);
+
+            Ed e_waitA;
+            e_waitA.weight = routing_settings_.bus_wait_time;
+            e_waitA.from   = vctxA->idx_waiting_;
+            e_waitA.to     = vctxA->idx_arrive_;
+
+            auto wid = graph_.AddEdge(e_waitA);
+            et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Wait, pStopA);
+
+            const Stop * pStopB = pBus->stops[(i+1) % ie];
+            VertexContext * vctxB = GetContextForStop(pStopB);
+            size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
+
+            Ed e_stopB;
+            e_stopB.weight = DistanceToTime(distance);
+            e_stopB.from   = e_waitA.to;
+            e_stopB.to     = vctxB->idx_waiting_;
+            wid = graph_.AddEdge(e_stopB);
+            et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{1, pBus});
+
+            lengths.push_back(e_stopB.weight);
+        }
+        // создаем пути со span_count >= 2
+        for (size_t i = 0, ie = pBus->stops.size() - 1; i < ie; ++i) {
+            const Stop * pStopA = pBus->stops[i];
+            VertexContext * vctxA = GetContextForStop(pStopA);
+            for (size_t j = i + 2, je = pBus->stops.size() - 1 + 2; j < je; ++j) {
+                const Stop * pStopB = pBus->stops[j % ie];
+                VertexContext * vctxB = GetContextForStop(pStopB);
+                Ed e_stopB;
+                e_stopB.from   = vctxA->idx_arrive_;
+                e_stopB.to     = vctxB->idx_waiting_;
+                e_stopB.weight = 0.0;
+                size_t span_count = j - i;
+                for (size_t cnt = 0; cnt < span_count; ++cnt) {
+                    e_stopB.weight += lengths[(i + cnt) % lengths.size()];
+                }
+                auto wid = graph_.AddEdge(e_stopB);
+                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{span_count, pBus});
+            }
+        }
+    } // PrepareRouteRing()
+
+    // не кольцевой маршрут
+    void PrepareRouteNotRing(const domain::Bus * pBus) {
+        assert(pBus);
+        assert(pBus->is_round_trip == false);
+
+        std::vector<double> lengths_up;
+        for (size_t i = 0, ie = pBus->stops.size(); i < ie; ++i) {
+            const Stop * pStopA = pBus->stops[i];
+            VertexContext * vctxA = GetContextForStop(pStopA);
+
+            Ed e_waitA;
+            e_waitA.weight = routing_settings_.bus_wait_time;
+            e_waitA.from   = vctxA->idx_waiting_;
+            e_waitA.to     = vctxA->idx_arrive_;
+
+            auto wid = graph_.AddEdge(e_waitA);
+            et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Wait, pStopA);
+
+            if (i + 1 >= ie) break;
+
+            const Stop * pStopB = pBus->stops[(i+1) % ie];
+            VertexContext * vctxB = GetContextForStop(pStopB);
+
+            size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
+
+            Ed e_stopB;
+            e_stopB.weight = DistanceToTime(distance);
+            e_stopB.from   = e_waitA.to;
+            e_stopB.to     = vctxB->idx_waiting_;
+            wid = graph_.AddEdge(e_stopB);
+            et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{1, pBus});
+
+            lengths_up.push_back(e_stopB.weight);
+        }
+        // идем в обратном направлении
+        std::vector<double> lengths_dn;
+        for (size_t i = pBus->stops.size() - 1; i > 0; --i) {
+            const Stop * pStopA = pBus->stops[i];
+            const Stop * pStopB = pBus->stops[i-1];
+            size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
+
+            VertexContext * vctxA = GetContextForStop(pStopA);
+            assert(vctxA);
+
+            VertexContext * vctxB = GetContextForStop(pStopB);
+            assert(vctxB);
+
+            Ed edge;
+            edge.weight = DistanceToTime(distance);
+            edge.from   = vctxA->idx_arrive_;
+            edge.to     = vctxB->idx_waiting_;
+            auto wid    = graph_.AddEdge(edge);
+            et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{1, pBus});
+
+            lengths_dn.push_back(edge.weight);
+        }
+#if 1
+        std::reverse(lengths_dn.begin(), lengths_dn.end());
+
+        // создаем пути со span_count >= 2 в прямом направлении
+        for (size_t i = 0, ie = pBus->stops.size(); i < ie; ++i) {
+            const Stop * pStopA = pBus->stops[i];
+            VertexContext * vctxA = GetContextForStop(pStopA);
+            for (size_t j = i + 2, je = pBus->stops.size() + 2; j < je; ++j) {
+                const Stop * pStopB = pBus->stops[j % ie];
+                VertexContext * vctxB = GetContextForStop(pStopB);
+                Ed e_stopB;
+                e_stopB.from   = vctxA->idx_arrive_;
+                e_stopB.to     = vctxB->idx_waiting_;
+                e_stopB.weight = 0.0;
+                size_t span_count = j - i;
+                for (size_t cnt = 0; cnt < span_count; ++cnt) {
+                    e_stopB.weight += lengths_up[(i + cnt) % lengths_up.size()];
+                }
+                auto wid = graph_.AddEdge(e_stopB);
+                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{span_count, pBus});
+            }
+        }
+        // создаем пути со span_count >= 2 в обратном направлении
+        for (size_t i = pBus->stops.size()-1; i > 0; --i) {
+            const Stop * pStopA = pBus->stops[i];
+            VertexContext * vctxA = GetContextForStop(pStopA);
+            for (size_t j = pBus->stops.size() + 2, je = i + 2; j > je; --j) {
+                const Stop * pStopB = pBus->stops[j % pBus->stops.size()];
+                VertexContext * vctxB = GetContextForStop(pStopB);
+                Ed e_stopB;
+                e_stopB.from   = vctxA->idx_arrive_;
+                e_stopB.to     = vctxB->idx_waiting_;
+                e_stopB.weight = 0.0;
+                size_t span_count = j - i;
+                for (size_t cnt = 0; cnt < span_count; ++cnt) {
+                    e_stopB.weight += lengths_dn[(i + cnt) % lengths_dn.size()];
+                }
+                auto wid = graph_.AddEdge(e_stopB);
+                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{span_count, pBus});
+            }
+        }
+#endif
+    } // PrepareRouteNotRing()
+
+    void Prepare() {
+        current_vertex_id_ = 0;
         for ( const auto & bus_id : db_ ) {
             const Bus * pBus = db_.GetBusPtr(bus_id);
-            // обрабатываем кольцевой маршрут
-            for (size_t i = 0, ie = pBus->stops.size(); i < ie; ++i) {
-                const Stop * pStopA = pBus->stops[i];
-                VertexContext * vctxA = ctx_by_stop_[pStopA];
-                if (!vctxA) {
-                    vctxA = new VertexContext;
-                    vctxA->stop_ = pStopA;
-                    vctxA->idx_waiting_ = current_vertex_id++;
-                    ctx_by_stop_[pStopA] = vctxA;
-                    vctx_by_idx_[vctxA->idx_waiting_] = vctxA;
-                }
-
-                Ed e_waitA;
-                e_waitA.weight = bus_waiting_time;
-                e_waitA.from   = vctxA->idx_waiting_;
-                e_waitA.to     = current_vertex_id++;
-                vctxA->idx_by_bus_[pBus] = e_waitA.to;
-
-                auto wid = graph_.AddEdge(e_waitA);
-                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Wait, pStopA);
-
-                if (i + 1 >= ie) {
-                    if (pBus->is_round_trip == false) break;
-                }
-
-                const Stop * pStopB = pBus->stops[(i+1) % ie];
-                VertexContext * vctxB = ctx_by_stop_[pStopB];
-                if (!vctxB) {
-                    vctxB = new VertexContext;
-                    vctxB->stop_ = pStopB;
-                    vctxB->idx_waiting_ = current_vertex_id++;
-                    ctx_by_stop_[pStopB] = vctxB;
-                    vctx_by_idx_[vctxB->idx_waiting_] = vctxB;
-                }
-
-                size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
-
-                Ed e_stopB;
-                e_stopB.weight = DistanceToTime(distance);
-                e_stopB.from   = e_waitA.to;
-                e_stopB.to     = vctxB->idx_waiting_;
-                wid = graph_.AddEdge(e_stopB);
-                et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, pBus);
-
-            } // for (size_t i = 0)
-
-            if (pBus->is_round_trip == false) {
-                for (size_t i = pBus->stops.size()-1; i > 0; --i) {
-                    const Stop * pStopA = pBus->stops[i];
-                    const Stop * pStopB = pBus->stops[i-1];
-                    size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
-
-                    VertexContext * vctxA = ctx_by_stop_[pStopA];
-                    assert(vctxA);
-
-                    VertexContext * vctxB = ctx_by_stop_[pStopB];
-                    assert(vctxB);
-
-                    Ed edge;
-                    edge.weight = DistanceToTime(distance);
-                    edge.from   = vctxA->idx_by_bus_[pBus];
-                    edge.to     = vctxB->idx_waiting_;
-                    auto wid    = graph_.AddEdge(edge);
-                    et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, pBus);
-                }
-            } // if (pBus->is_round_trip)
-        } // for ( const std::string & bus_id : db_ )
-
+            if (pBus->is_round_trip) {
+                PrepareRouteRing(pBus);
+            } else {
+                PrepareRouteNotRing(pBus);
+            }
+        }
         ptr_router_.reset(new ROUTER(graph_));
-    }
+    } // Prepare()
 }; // class RouteGraph
 
 // //////////////////////////////////////////////////////////// //

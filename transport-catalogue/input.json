@@ -7,6 +7,8 @@
                   "Biryulyovo Zapadnoye",
                   "Biryulyovo Tovarnaya",
                   "Universam",
+                  "Biryusinka",
+                  "Apteka",
                   "Biryulyovo Zapadnoye"
               ],
               "type": "Bus"
@@ -17,7 +19,23 @@
               "stops": [
                   "Biryulyovo Tovarnaya",
                   "Universam",
+                  "Biryusinka",
+                  "TETs 26",
+                  "Pokrovskaya",
                   "Prazhskaya"
+              ],
+              "type": "Bus"
+          },
+          {
+              "is_roundtrip": false,
+              "name": "828",
+              "stops": [
+                  "Biryulyovo Zapadnoye",
+                  "TETs 26",
+                  "Biryusinka",
+                  "Universam",
+                  "Pokrovskaya",
+                  "Rossoshanskaya ulitsa"
               ],
               "type": "Bus"
           },
@@ -26,7 +44,8 @@
               "longitude": 37.6517,
               "name": "Biryulyovo Zapadnoye",
               "road_distances": {
-                  "Biryulyovo Tovarnaya": 2600
+                  "Biryulyovo Tovarnaya": 2600,
+                  "TETs 26": 1100
               },
               "type": "Stop"
           },
@@ -36,8 +55,8 @@
               "name": "Universam",
               "road_distances": {
                   "Biryulyovo Tovarnaya": 1380,
-                  "Biryulyovo Zapadnoye": 2500,
-                  "Prazhskaya": 4650
+                  "Biryusinka": 760,
+                  "Pokrovskaya": 2460
               },
               "type": "Stop"
           },
@@ -51,9 +70,82 @@
               "type": "Stop"
           },
           {
+              "latitude": 55.581065,
+              "longitude": 37.64839,
+              "name": "Biryusinka",
+              "road_distances": {
+                  "Apteka": 210,
+                  "TETs 26": 400
+              },
+              "type": "Stop"
+          },
+          {
+              "latitude": 55.580023,
+              "longitude": 37.652296,
+              "name": "Apteka",
+              "road_distances": {
+                  "Biryulyovo Zapadnoye": 1420
+              },
+              "type": "Stop"
+          },
+          {
+              "latitude": 55.580685,
+              "longitude": 37.642258,
+              "name": "TETs 26",
+              "road_distances": {
+                  "Pokrovskaya": 2850
+              },
+              "type": "Stop"
+          },
+          {
+              "latitude": 55.603601,
+              "longitude": 37.635517,
+              "name": "Pokrovskaya",
+              "road_distances": {
+                  "Rossoshanskaya ulitsa": 3140
+              },
+              "type": "Stop"
+          },
+          {
+              "latitude": 55.595579,
+              "longitude": 37.605757,
+              "name": "Rossoshanskaya ulitsa",
+              "road_distances": {
+                  "Pokrovskaya": 3210
+              },
+              "type": "Stop"
+          },
+          {
               "latitude": 55.611717,
               "longitude": 37.603938,
               "name": "Prazhskaya",
+              "road_distances": {
+                  "Pokrovskaya": 2260
+              },
+              "type": "Stop"
+          },
+          {
+              "is_roundtrip": false,
+              "name": "750",
+              "stops": [
+                  "Tolstopaltsevo",
+                  "Rasskazovka"
+              ],
+              "type": "Bus"
+          },
+          {
+              "latitude": 55.611087,
+              "longitude": 37.20829,
+              "name": "Tolstopaltsevo",
+              "road_distances": {
+                  "Rasskazovka": 13800
+              },
+              "type": "Stop"
+          },
+          {
+              "latitude": 55.632761,
+              "longitude": 37.333324,
+              "name": "Rasskazovka",
               "road_distances": {},
               "type": "Stop"
           }
@@ -92,8 +184,8 @@
           "width": 200
       },
       "routing_settings": {
-          "bus_velocity": 40,
-          "bus_wait_time": 6
+          "bus_velocity": 30,
+          "bus_wait_time": 2
       },
       "stat_requests": [
           {
@@ -108,19 +200,54 @@
           },
           {
               "id": 3,
+              "name": "828",
+              "type": "Bus"
+          },
+          {
+              "id": 4,
               "name": "Universam",
               "type": "Stop"
           },
           {
               "from": "Biryulyovo Zapadnoye",
-              "id": 4,
-              "to": "Universam",
+              "id": 5,
+              "to": "Apteka",
               "type": "Route"
           },
           {
               "from": "Biryulyovo Zapadnoye",
-              "id": 5,
+              "id": 6,
+              "to": "Pokrovskaya",
+              "type": "Route"
+          },
+          {
+              "from": "Biryulyovo Tovarnaya",
+              "id": 7,
+              "to": "Pokrovskaya",
+              "type": "Route"
+          },
+          {
+              "from": "Biryulyovo Tovarnaya",
+              "id": 8,
+              "to": "Biryulyovo Zapadnoye",
+              "type": "Route"
+          },
+          {
+              "from": "Biryulyovo Tovarnaya",
+              "id": 9,
               "to": "Prazhskaya",
+              "type": "Route"
+          },
+          {
+              "from": "Apteka",
+              "id": 10,
+              "to": "Biryulyovo Tovarnaya",
+              "type": "Route"
+          },
+          {
+              "from": "Biryulyovo Zapadnoye",
+              "id": 11,
+              "to": "Tolstopaltsevo",
               "type": "Route"
           }
       ]
