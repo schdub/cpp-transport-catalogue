@@ -2,6 +2,7 @@
 #include "transport_catalogue.h"
 #include "request_handler.h"
 #include <cassert>
+#include <cmath>
 
 using namespace tcatalogue;
 

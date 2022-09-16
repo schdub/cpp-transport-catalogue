@@ -52,12 +52,16 @@ bool WorkBus(const json::Dict & dict, BUS & bus) {
     //"name": "114",
     //"stops": ["Морской вокзал", "Ривьерский мост"],
     //"is_roundtrip": false
+//    std::unordered_set<std::string> uinq_stops;
     try {
         bus.bus_id_        = dict.at("name").AsString();
         bus.is_round_trip_ = dict.at("is_roundtrip").AsBool();
         bus.stops_.clear();
         for (const auto & stop : dict.at("stops").AsArray()) {
-            bus.stops_.push_back(stop.AsString());
+            const std::string & str_stop = stop.AsString();
+//            if (uinq_stops.count(str_stop) > 0) continue;
+//            uinq_stops.insert(str_stop);
+            bus.stops_.push_back(str_stop);
         }
     } catch(...) {
         return false;
