@@ -18,6 +18,8 @@ RouteGraph::~RouteGraph() {
     }
 }
 
+// получаем информацию о пути из графа и возвращаем его в переменную ri,
+// если есть таковой. в случае ошибочных ситуаций функция возвращает ложь.
 bool RouteGraph::Build(const std::string & from, const std::string & to, ROUTER::RouteInfo & ri) {
     assert(isPrepared());
     Stop * stop_from  = db_.GetStop( from );
@@ -38,8 +40,8 @@ bool RouteGraph::Build(const std::string & from, const std::string & to, ROUTER:
     return false;
 }
 
+// заполняем отклик на основании данных из о пути из графа.
 void RouteGraph::FillResponse(const ROUTER::RouteInfo & route_info, domain::STAT_RESP_ROUTE & route_response ) {
-//        std::cerr << route_info.weight << std::endl;
     route_response.total_time = route_info.weight;
     route_response.items.clear();
     for (graph::EdgeId eid : route_info.edges) {
@@ -48,7 +50,6 @@ void RouteGraph::FillResponse(const ROUTER::RouteInfo & route_info, domain::STAT
         if (edge.first == EDGE_TYPE::et_Bus) {
             RidingBus bus_context = std::get<RidingBus>(edge.second);
             const domain::Bus * pBus = bus_context.bus_;
-//                std::cerr << " " << pBus->id << " " << ed.weight << std::endl;
             STAT_RESP_ROUTE_ITEM_BUS item_bus;
             item_bus.bus        = pBus->id;
             item_bus.span_count = bus_context.span_count_;
@@ -56,7 +57,6 @@ void RouteGraph::FillResponse(const ROUTER::RouteInfo & route_info, domain::STAT
             route_response.items.emplace_back(STAT_RESP_ROUTE_ITEM{STAT_RESP_ROUTE_ITEM_TYPE::BUS, std::move(item_bus)});
         } else if (edge.first == EDGE_TYPE::et_Wait) {
             const domain::Stop* pStop = std::get<const domain::Stop*>(edge.second);
-//                std::cerr << " waiting " << pStop->name << " " << ed.weight << std::endl;
             STAT_RESP_ROUTE_ITEM_WAIT item_wait;
             item_wait.stop_name = pStop->name;
             item_wait.time = ed.weight;
@@ -65,12 +65,14 @@ void RouteGraph::FillResponse(const ROUTER::RouteInfo & route_info, domain::STAT
     }
 }
 
+// построин ли уже был граф?
 bool RouteGraph::isPrepared() const {
     return (ptr_router_ != nullptr);
 }
 
+// конвертируем указанное расстояние в метрах во
+// время, которое будет затрачено при указанной скорости
 double RouteGraph::DistanceToTime(size_t distance) {
-    //((2600 + 890) / (40. * 5./18.) ) / 60.
     double result = distance;
 #if 1
     result /= (routing_settings_.bus_velocity * 5 / 18);
@@ -79,12 +81,13 @@ double RouteGraph::DistanceToTime(size_t distance) {
     return result;
 }
 
+// получаем контекст указанной вершины
 RouteGraph::VertexContext * RouteGraph::GetContextForStop(const domain::Stop * pStop) {
     auto it_ctx = ctx_by_stop_.find(pStop);
     if (it_ctx != ctx_by_stop_.end()) {
         return it_ctx->second;
     }
-    VertexContext * result = new VertexContext;
+    VertexContext * result = new VertexContext; // удаляется в деструкторе нашего класса
     ctx_by_stop_[pStop]  = result;
     result->idx_waiting_ = current_vertex_id_++;
     result->idx_arrive_  = current_vertex_id_++;
@@ -96,29 +99,35 @@ void RouteGraph::PrepareRouteRing(const domain::Bus * pBus) {
     assert(pBus);
     assert(pBus->is_round_trip == true);
 
-    std::vector<Ty> lengths;
+    std::vector<Ty> lengths; // информация о весах ребер для span_cout == 1
     for (size_t i = 0, ie = pBus->stops.size()-1; i < ie; ++i) {
+        // получаем либо создаем контекст данной остановки
         const Stop * pStopA = pBus->stops[i];
         VertexContext * vctxA = GetContextForStop(pStopA);
 
+        // создаем ребро ожидания на данной остановке
         Ed e_waitA;
         e_waitA.weight = routing_settings_.bus_wait_time;
         e_waitA.from   = vctxA->idx_waiting_;
         e_waitA.to     = vctxA->idx_arrive_;
 
+        // добавим в граф
         auto wid = graph_.AddEdge(e_waitA);
         et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Wait, pStopA);
 
+        // информация об остановке назначения
         const Stop * pStopB = pBus->stops[(i+1) % pBus->stops.size()];
         VertexContext * vctxB = GetContextForStop(pStopB);
         size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
 
+        // создаем ребро поездки, при span_count == 1
         Ed e_stopB;
         e_stopB.weight = DistanceToTime(distance);
         e_stopB.from   = e_waitA.to;
         e_stopB.to     = vctxB->idx_waiting_;
         wid = graph_.AddEdge(e_stopB);
         et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{1, pBus});
+
         lengths.push_back(e_stopB.weight);
     }
     // создаем пути со span_count >= 2
@@ -147,11 +156,15 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
     assert(pBus);
     assert(pBus->is_round_trip == false);
 
-    std::vector<Ty> lengths_up;
+    std::vector<Ty> lengths_up; // храним веса ребер между соедененными остановками
+                                // для прохода в прямом направлении
+    // выполняем действия для span_count == 1
     for (size_t i = 0;; ++i) {
+        // получаем контекси для соответствующей остановки
         const Stop * pStopA = pBus->stops[i];
         VertexContext * vctxA = GetContextForStop(pStopA);
 
+        // создаем ребро ожидания
         Ed e_waitA;
         e_waitA.weight = routing_settings_.bus_wait_time;
         e_waitA.from   = vctxA->idx_waiting_;
@@ -160,13 +173,18 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
         auto wid = graph_.AddEdge(e_waitA);
         et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Wait, pStopA);
 
+        // нужно ли создавать ребро поездки?
         if (i + 1 >= pBus->stops.size()) break;
 
+        // получаем информации о следующей остановке
         const Stop * pStopB = pBus->stops[(i+1)];
         VertexContext * vctxB = GetContextForStop(pStopB);
 
         size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
 
+        // соединяем две остановки ребром. причем, начальная вершина
+        // ребра это вершина после окончания ожидания на остановке А
+        // конечная же, это начало ожидания на остановке Б
         Ed e_stopB;
         e_stopB.weight = DistanceToTime(distance);
         e_stopB.from   = e_waitA.to;
@@ -174,8 +192,10 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
         wid = graph_.AddEdge(e_stopB);
         et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{1, pBus});
 
+        // запоминаем вес ребра для последующих
         lengths_up.push_back(e_stopB.weight);
     }
+
     // идем в обратном направлении
     std::vector<Ty> lengths_dn;
     for (size_t i = pBus->stops.size() - 1; i > 0; --i) {
@@ -183,6 +203,8 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
         const Stop * pStopB = pBus->stops[i-1];
         size_t distance = db_.GetDistanceBetween( pStopA, pStopB );
 
+        // оба контектса созданы в цикле выше, и уже
+        // должны существовать
         VertexContext * vctxA = GetContextForStop(pStopA);
         assert(vctxA);
 
@@ -241,14 +263,12 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
     }
 } // PrepareRouteNotRing()
 
+// поочередно пересчитываем информацию о всех маршрутах.
 void RouteGraph::Prepare() {
 //    LOG_DURATION(__FUNCTION__);
     current_vertex_id_ = 0;
     for ( const auto & bus_id : db_ ) {
         const Bus * pBus = db_.GetBusPtr(bus_id);
-//        if (pBus->id == "4") {
-//            current_vertex_id_ = current_vertex_id_;
-//        }
         if (pBus->is_round_trip) {
             PrepareRouteRing(pBus);
         } else {

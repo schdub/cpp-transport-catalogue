@@ -74,9 +74,6 @@ bool RequestHandler::HandleRoute(const domain::STAT_REQ_ROUTE & route_request,
     if (!route_graph_->isPrepared()) {
         route_graph_->Prepare();
     }
-
-//    std::cerr << route_request.from_ << " " << route_request.to_ << std::endl;
-
     RouteGraph::ROUTER::RouteInfo route_info;
     if (route_graph_->Build(route_request.from_, route_request.to_, route_info)) {
         route_graph_->FillResponse(route_info, route_response);
