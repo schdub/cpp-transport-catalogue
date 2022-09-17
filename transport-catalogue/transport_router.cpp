@@ -218,13 +218,12 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
             et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{span_count, pBus});
         }
     }
-#if 1
     // создаем пути со span_count >= 2 в обратном направлении
-//    std::reverse(lengths_dn.begin(), lengths_dn.end());
+    std::reverse(lengths_dn.begin(), lengths_dn.end());
     for (size_t i = pBus->stops.size()-1; i >= 2; --i) {
         const Stop * pStopA = pBus->stops[i];
         VertexContext * vctxA = GetContextForStop(pStopA);
-        for (size_t j = i - 2; ; --j) {
+        for (size_t j = i - 2;; --j) {
             const Stop * pStopB = pBus->stops[j];
             VertexContext * vctxB = GetContextForStop(pStopB);
             Ed e_stopB;
@@ -233,14 +232,13 @@ void RouteGraph::PrepareRouteNotRing(const domain::Bus * pBus) {
             e_stopB.weight = 0.0;
             size_t span_count = i - j;
             for (size_t cnt = 0; cnt < span_count; ++cnt) {
-                e_stopB.weight += lengths_dn[(i + cnt) % lengths_dn.size()];
+                e_stopB.weight += lengths_dn[(i - cnt - 1)];
             }
             auto wid = graph_.AddEdge(e_stopB);
             et_by_eid_[wid] = std::make_pair(EDGE_TYPE::et_Bus, RidingBus{span_count, pBus});
             if (j == 0) break;
         }
     }
-#endif
 } // PrepareRouteNotRing()
 
 void RouteGraph::Prepare() {
