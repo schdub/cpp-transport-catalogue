@@ -12,14 +12,12 @@
 
 using namespace domain;
 
-const size_t MAX_GRAPH_IDXES = 4096;
-
 RequestHandler::RequestHandler(tcatalogue::TransportCatalogue & db,
                                renderer::MapRenderer & drawer,
                                const domain::RoutingSettings & routing_settings)
     : db_(db)
     , drawer_(drawer)
-    , route_graph_(new RouteGraph(db, routing_settings, MAX_GRAPH_IDXES))
+    , route_graph_(new RouteGraph(db, routing_settings))
 {}
 
 const domain::Bus& RequestHandler::GetBus(domain::BusId id) const {

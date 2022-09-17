@@ -30,6 +30,8 @@ public:
     const domain::Bus& GetBus(domain::BusId id) const;
     const domain::Bus* GetBusPtr(domain::BusId id) const;
 
+    size_t StopCount() const;
+
     domain::Stop* GetStop(const std::string & stop_name) const;
 
     domain::StopBusesOpt GetStopBuses(std::string_view stop_name) const;

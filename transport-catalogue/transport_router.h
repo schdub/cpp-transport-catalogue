@@ -20,8 +20,7 @@ public:
     using ROUTER = graph::Router<Ty>;
 
     RouteGraph(tcatalogue::TransportCatalogue & db,
-               const domain::RoutingSettings & routing_settings,
-               size_t vertex_count);
+               const domain::RoutingSettings & routing_settings);
 
     ~RouteGraph();
 
@@ -46,7 +45,6 @@ private:
         graph::VertexId idx_arrive_ = std::numeric_limits<graph::VertexId>::max();
     };
     std::unordered_map<const domain::Stop*, VertexContext*> ctx_by_stop_;
-    std::unordered_map<graph::VertexId, VertexContext*> vctx_by_idx_;
 
     enum class EDGE_TYPE {
         ed_Unknown,

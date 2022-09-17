@@ -131,4 +131,8 @@ std::unordered_set<std::string_view>::const_iterator TransportCatalogue::end() c
     return bus_ids_.end();
 }
 
+size_t TransportCatalogue::StopCount() const {
+    return stops_.size();
+}
+
 } // namespace tcatalogue
