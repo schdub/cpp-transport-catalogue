@@ -27,8 +27,8 @@ public:
     void AddStop(std::string name, geo::Coordinates coordinates);
     void AddBus(domain::BusId id, const domain::StopsList & stops, bool is_ring_root);
 
-    const domain::Bus& GetBus(domain::BusId id) const;
-    const domain::Bus* GetBusPtr(domain::BusId id) const;
+    const domain::Bus& GetBus(std::string_view id) const;
+    const domain::Bus* GetBusPtr(std::string_view id) const;
 
     size_t StopCount() const;
 

@@ -1,13 +1,12 @@
 #include "transport_router.h"
 #include "transport_catalogue.h"
-#include "log_duration.h"
+//#include "log_duration.h"
 
 using namespace domain;
 
-RouteGraph::RouteGraph(tcatalogue::TransportCatalogue & db,
-                       const domain::RoutingSettings & routing_settings)
+RouteGraph::RouteGraph(tcatalogue::TransportCatalogue & db)
     : db_(db)
-    , routing_settings_(routing_settings)
+    , routing_settings_(domain::Settings::instance().routing_settings.value())
     , current_vertex_id_(0)
     , graph_(db.StopCount() * 2)
 {}

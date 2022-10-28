@@ -158,4 +158,9 @@ StringList split(std::string_view s, const std::string & delimiter) {
     return res;
 }
 
+Settings& Settings::instance() {
+    static Settings instance;
+    return instance;
+}
+
 } // namespace domain

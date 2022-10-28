@@ -18,9 +18,27 @@ class TransportCatalogue;
 
 namespace domain {
 
+struct SerializeSettings {
+    std::string file;
+};
+
 struct RoutingSettings {
     double bus_velocity;
     double bus_wait_time;
+};
+
+class Settings {
+private:
+    Settings() {}
+
+public:
+    std::optional<RoutingSettings> routing_settings;
+    std::optional<SerializeSettings> serialize_settings;
+
+    static Settings& instance();
+
+    Settings(const Settings &) = delete;
+    Settings& operator=(const Settings &) = delete;
 };
 
 struct Stop {
@@ -35,7 +53,7 @@ struct STOP {
 };
 using STOPS = std::list<STOP>;
 
-using BusId = std::string_view;
+using BusId = std::string;
 struct Bus {
     BusId id;
     bool is_round_trip;
@@ -46,7 +64,7 @@ using StopsList = std::list<std::string>;
 using StopBusesOpt = std::optional<std::reference_wrapper<const std::unordered_set<Bus*>>>;
 
 struct BUS {
-    BusId bus_id_;
+    std::string bus_id_;
     StopsList stops_;
     bool is_round_trip_;
 };

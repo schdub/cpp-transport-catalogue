@@ -161,7 +161,7 @@ svg::Color FromJsonNodeColor(const json::Node & node) {
 }
 
 renderer::Settings FromJsonSettings(const json::Dict & dict) {
-    Settings result;
+    renderer::Settings result;
 //    try {
     result.width                = dict.at("width").AsDouble();
     result.height               = dict.at("height").AsDouble();
@@ -206,6 +206,18 @@ domain::RoutingSettings FromJsonRouteSettings(const json::Dict & dict) {
     return result;
 }
 
+domain::SerializeSettings FromJsonSerializeSettings(const json::Dict & dict) {
+    domain::SerializeSettings result;
+//    try {
+    result.file = dict.at("file").AsString();
+//    } catch(...) {
+//        std::stringstream stream;
+//        json::Print(json::Document(dict), stream);
+//        throw std::logic_error(stream.str());
+//    }
+    return result;
+}
+
 std::optional<renderer::Settings> JsonReader::ParseRenderSettings() {
     if (!doc_->GetRoot().IsMap()) {
         return std::nullopt;
@@ -220,6 +232,14 @@ std::optional<domain::RoutingSettings> JsonReader::ParseRoutingSettings() {
     }
     const auto & m = doc_->GetRoot().AsMap();
     return FromJsonRouteSettings(m.at("routing_settings").AsMap());
+}
+
+std::optional<domain::SerializeSettings> JsonReader::ParseSerializeSettings() {
+    if (!doc_->GetRoot().IsMap()) {
+        return std::nullopt;
+    }
+    const auto & m = doc_->GetRoot().AsMap();
+    return FromJsonSerializeSettings(m.at("serialization_settings").AsMap());
 }
 
 } // namespace tcatalogue

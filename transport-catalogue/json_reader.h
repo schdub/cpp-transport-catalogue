@@ -20,6 +20,7 @@ public:
     void ParseStatRequests(domain::STAT_REQUESTS & requests);
     std::optional<renderer::Settings> ParseRenderSettings();
     std::optional<domain::RoutingSettings> ParseRoutingSettings();
+    std::optional<domain::SerializeSettings> ParseSerializeSettings();
 };
 
 } // namespace tcatalogue

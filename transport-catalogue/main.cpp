@@ -1,9 +1,13 @@
+#include <fstream>
+#include <iostream>
+#include <string_view>
 #include <iostream>
 #include "transport_catalogue.h"
 #include "json_reader.h"
 #include "request_handler.h"
 #include "map_renderer.h"
 #include "json_builder.h"
+#include "serialization.h"
 #include <cassert>
 
 #include "domain.h"
@@ -11,6 +15,7 @@
 using namespace json;
 using namespace domain;
 using namespace tcatalogue;
+using namespace std::literals;
 
 void FillStatResponse(const RESP_ERROR & resp, json::Builder & builder) {
     builder.StartDict()
@@ -72,16 +77,30 @@ void FillStatResponse(const STAT_RESP_ROUTE & resp, json::Builder & builder) {
     builder.EndArray().EndDict();
 }
 
-int main() {
+void PrintUsage(std::ostream& stream = std::cerr) {
+    stream << "Usage: transport_catalogue [make_base|process_requests]\n"sv;
+}
+
+int ProcessRequests() {
     JsonReader reader(std::cin);
     if (!reader.IsOk()) {
+        return EXIT_FAILURE;
+    }
+
+    domain::Settings& ref_settings = domain::Settings::instance();
+    ref_settings.serialize_settings = reader.ParseSerializeSettings();
+    if (!ref_settings.serialize_settings.has_value()) {
+        // WARN() << "can't parse serialize_settings!" << std::endl;
         return EXIT_FAILURE;
     }
 
     TransportCatalogue db; {
         STOPS stops;
         BUSES buses;
-        reader.ParseInput(stops, buses);
+        if (!Serialization::Read(buses, stops)) {
+            // WARN() << "can't parse serialized database!" << std::endl;
+            return EXIT_FAILURE;
+        }
         FillDatabase(db, stops, buses);
     }
 
@@ -91,11 +110,15 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    auto opt_routing_settings = reader.ParseRoutingSettings();
-    if (!opt_routing_settings.has_value()) {
+#if 1
+    ref_settings.routing_settings = domain::RoutingSettings();
+#else
+    ref_settings.routing_settings = reader.ParseRoutingSettings();
+    if (!ref_settings.routing_settings.has_value()) {
         // WARN() << "can't parse routing_settings!" << std::endl;
         return EXIT_FAILURE;
     }
+#endif
 
     STAT_RESPONSES responses; {
         STAT_REQUESTS stat_requests;
@@ -104,7 +127,7 @@ int main() {
             //LOG() << "stat_requests is empty." << std::endl;
         } else {
             renderer::MapRenderer drawer(opt_renderer_settings.value());
-            RequestHandler handler(db, drawer, opt_routing_settings.value());
+            RequestHandler handler(db, drawer);
             FillStatResponses(handler, stat_requests, responses);
         }
     }
@@ -126,3 +149,40 @@ int main() {
 
     return EXIT_SUCCESS;
 }
+
+int MakeBase() {
+    JsonReader reader(std::cin);
+    if (!reader.IsOk()) {
+        return EXIT_FAILURE;
+    }
+
+    domain::Settings& ref_settings = domain::Settings::instance();
+    ref_settings.serialize_settings = reader.ParseSerializeSettings();
+    if (!ref_settings.serialize_settings.has_value()) {
+        // WARN() << "can't parse serialize_settings!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    STOPS stops;
+    BUSES buses;
+    reader.ParseInput(stops, buses);
+    Serialization::Write(buses, stops);
+    return EXIT_SUCCESS;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        PrintUsage();
+        return EXIT_FAILURE;
+    }
+    const std::string_view mode(argv[1]);
+    if (mode == "make_base"sv) {
+        return MakeBase();
+    } else if (mode == "process_requests"sv) {
+        return ProcessRequests();
+    } else {
+        PrintUsage();
+        return EXIT_FAILURE;
+    }
+}
+

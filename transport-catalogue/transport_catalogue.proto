@@ -1,0 +1,26 @@
+syntax = "proto2";
+
+package transport_catalogue_pb;
+
+message Distance {
+    required string name = 1;
+    required uint32 distance = 2;
+}
+
+message Stop {
+    required string name = 1;
+    required double lat = 2;
+    required double lng = 3;
+    repeated Distance road_distances = 4;
+}
+
+message Bus {
+    required string bus_id = 1;
+    repeated string stops = 2; //repeated Stop stops = 2;
+    required bool is_round_trip = 3;
+}
+
+message Catalogue {
+    repeated Stop stops = 1;
+    repeated Bus  buses = 2;
+}

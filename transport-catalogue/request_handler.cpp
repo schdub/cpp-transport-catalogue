@@ -13,11 +13,10 @@
 using namespace domain;
 
 RequestHandler::RequestHandler(tcatalogue::TransportCatalogue & db,
-                               renderer::MapRenderer & drawer,
-                               const domain::RoutingSettings & routing_settings)
+                               renderer::MapRenderer & drawer)
     : db_(db)
     , drawer_(drawer)
-    , route_graph_(new RouteGraph(db, routing_settings))
+    , route_graph_(new RouteGraph(db))
 {}
 
 const domain::Bus& RequestHandler::GetBus(domain::BusId id) const {

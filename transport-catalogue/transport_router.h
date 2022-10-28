@@ -19,8 +19,7 @@ public:
     using GRAPH = graph::DirectedWeightedGraph<Ty>;
     using ROUTER = graph::Router<Ty>;
 
-    RouteGraph(tcatalogue::TransportCatalogue & db,
-               const domain::RoutingSettings & routing_settings);
+    RouteGraph(tcatalogue::TransportCatalogue & db);
 
     ~RouteGraph();
 

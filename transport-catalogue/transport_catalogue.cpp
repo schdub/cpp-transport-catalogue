@@ -56,7 +56,7 @@ void TransportCatalogue::AddBus(BusId id, const StopsList & stops, bool is_round
     }
 }
 
-const Bus& TransportCatalogue::GetBus(BusId id) const {
+const Bus& TransportCatalogue::GetBus(std::string_view id) const {
     auto it = buses_.find(id);
     if (it == buses_.end() || it->second == nullptr) {
         static Bus empty_bus_information;
@@ -65,7 +65,7 @@ const Bus& TransportCatalogue::GetBus(BusId id) const {
     return *(it->second);
 }
 
-const domain::Bus* TransportCatalogue::GetBusPtr(domain::BusId id) const {
+const domain::Bus* TransportCatalogue::GetBusPtr(std::string_view id) const {
     auto it = buses_.find(id);
     if (it == buses_.end() || it->second == nullptr) {
         return nullptr;
