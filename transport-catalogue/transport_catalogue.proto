@@ -20,7 +20,34 @@ message Bus {
     required bool is_round_trip = 3;
 }
 
+message Point {
+    required double x = 1;
+    required double y = 2;
+}
+
+message Color {
+    optional string name = 1;
+    optional fixed32 rgb = 2;
+    optional double opacity = 3;
+}
+
+message RenderSettings {
+    required double width = 1;
+    required double height = 2;
+    required double padding = 3;
+    required double stop_radius = 4;
+    required double line_width = 5;
+    required double bus_label_font_size = 6;
+    required Point bus_label_offset = 7;
+    required double stop_label_font_size = 8;
+    required Point stop_label_offset = 9;
+    required Color underlayer_color = 10;
+    required double underlayer_width = 11;
+    repeated Color color_palette = 12;
+};
+
 message Catalogue {
     repeated Stop stops = 1;
     repeated Bus  buses = 2;
+    optional RenderSettings render_settings = 3;
 }
