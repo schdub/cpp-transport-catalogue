@@ -55,12 +55,10 @@ void svgColorDeserialize(const ::transport_catalogue_pb::Color & in_color,
     }
 }
 
-void Serialization::Write(const domain::BUSES & busses,
-                          const domain::STOPS & stops,
-                          const std::optional<renderer::Settings> & opt_render_settings) {
+void Serialization::Write(const Context & context) {
     ::transport_catalogue_pb::Catalogue cat;
     // stops
-    for (const domain::STOP & stop : stops) {
+    for (const domain::STOP & stop : context.stops) {
         ::transport_catalogue_pb::Stop* pbStop = cat.add_stops();
         pbStop->set_name(stop.stop_name_);
         pbStop->set_lat(stop.coordinates_.lat);
@@ -72,7 +70,7 @@ void Serialization::Write(const domain::BUSES & busses,
         }
     }
     // busses
-    for (const domain::BUS & bus : busses) {
+    for (const domain::BUS & bus : context.busses) {
         ::transport_catalogue_pb::Bus* pbBus = cat.add_buses();
         pbBus->set_bus_id(std::string(bus.bus_id_));
         pbBus->set_is_round_trip(bus.is_round_trip_);
@@ -81,8 +79,8 @@ void Serialization::Write(const domain::BUSES & busses,
         }
     }
     // render settings
-    if (opt_render_settings.has_value()) {
-        const auto & rs = opt_render_settings.value();
+    if (context.render_settings.has_value()) {
+        const auto & rs = context.render_settings.value();
         ::transport_catalogue_pb::RenderSettings* pbRS = cat.mutable_render_settings();
         pbRS->set_width(rs.width);
         pbRS->set_height(rs.height);
@@ -113,9 +111,7 @@ void Serialization::Write(const domain::BUSES & busses,
     cat.SerializeToOstream(&output_file);
 }
 
-bool Serialization::Read(domain::BUSES & busses,
-                         domain::STOPS & stops,
-                         renderer::Settings & render_settings) {
+bool Serialization::Read(Context & context) {
     // input from file stream
     std::ifstream input_file(GetFilePath(), std::ios::binary);
 
@@ -124,7 +120,7 @@ bool Serialization::Read(domain::BUSES & busses,
         return false;
     }
 
-    stops.clear();
+    context.stops.clear();
     for (int i = 0; i < cat.stops_size(); ++i) {
         domain::STOP stop;
         const ::transport_catalogue_pb::Stop& ref_stop = cat.stops(i);
@@ -136,10 +132,10 @@ bool Serialization::Read(domain::BUSES & busses,
             const ::transport_catalogue_pb::Distance& ref_dist = ref_stop.road_distances(j);
             stop.distances_.emplace_back(ref_dist.name(), ref_dist.distance());
         }
-        stops.emplace_back(std::move(stop));
+        context.stops.emplace_back(std::move(stop));
     }
 
-    busses.clear();
+    context.busses.clear();
     for (int i = 0; i < cat.buses_size(); ++i) {
         domain::BUS bus;
         const ::transport_catalogue_pb::Bus& ref_bus = cat.buses(i);
@@ -149,12 +145,13 @@ bool Serialization::Read(domain::BUSES & busses,
             const std::string & stop_name = ref_bus.stops(j);
             bus.stops_.emplace_back(stop_name);
         }
-        busses.emplace_back(std::move(bus));
+        context.busses.emplace_back(std::move(bus));
     }
 
     // render settings
     if (cat.has_render_settings()) {
         const auto & pbRS = cat.render_settings();
+        renderer::Settings render_settings;
         render_settings.width = pbRS.width();
         render_settings.height = pbRS.height();
         render_settings.padding = pbRS.padding();
@@ -177,6 +174,7 @@ bool Serialization::Read(domain::BUSES & busses,
             svgColorDeserialize(pbRS.color_palette(i), color);
             render_settings.color_palette.emplace_back(std::move(color));
         }
+        context.render_settings = std::move(render_settings);
     }
     return true;
 }

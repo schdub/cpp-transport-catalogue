@@ -94,15 +94,13 @@ int ProcessRequests() {
         return EXIT_FAILURE;
     }
 
-    renderer::Settings render_settings;
+    Serialization::Context context;
     TransportCatalogue db; {
-        STOPS stops;
-        BUSES buses;
-        if (!Serialization::Read(buses, stops, render_settings)) {
+        if (!Serialization::Read(context)) {
             // WARN() << "can't parse serialized database!" << std::endl;
             return EXIT_FAILURE;
         }
-        FillDatabase(db, stops, buses);
+        FillDatabase(db, context.stops, context.busses);
     }
 
 #if 1
@@ -121,7 +119,7 @@ int ProcessRequests() {
         if (stat_requests.empty()) {
             //LOG() << "stat_requests is empty." << std::endl;
         } else {
-            renderer::MapRenderer drawer(render_settings);
+            renderer::MapRenderer drawer(context.render_settings.value());
             RequestHandler handler(db, drawer);
             FillStatResponses(handler, stat_requests, responses);
         }
@@ -158,16 +156,15 @@ int MakeBase() {
         return EXIT_FAILURE;
     }
 
-    auto opt_renderer_settings = reader.ParseRenderSettings();
-    if (!opt_renderer_settings.has_value()) {
+    Serialization::Context context;
+    context.render_settings = reader.ParseRenderSettings();
+    if (!context.render_settings.has_value()) {
         // WARN() << "can't parse render_settings!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    STOPS stops;
-    BUSES buses;
-    reader.ParseInput(stops, buses);
-    Serialization::Write(buses, stops, opt_renderer_settings);
+    reader.ParseInput(context.stops, context.busses);
+    Serialization::Write(context);
     return EXIT_SUCCESS;
 }
 

@@ -7,10 +7,12 @@ class Serialization {
     static const std::string& GetFilePath();
 
 public:
-    static bool Read(domain::BUSES & busses,
-                     domain::STOPS & stops,
-                     renderer::Settings & render_settings);
-    static void Write(const domain::BUSES & busses,
-                      const domain::STOPS & stops,
-                      const std::optional<renderer::Settings> & opt_render_settings);
+    struct Context {
+        domain::BUSES busses;
+        domain::STOPS stops;
+        std::optional<renderer::Settings> render_settings;
+    };
+
+    static bool Read(Context & context);
+    static void Write(const Context & context);
 };
