@@ -4,9 +4,9 @@
 
 using namespace domain;
 
-RouteGraph::RouteGraph(tcatalogue::TransportCatalogue & db)
+RouteGraph::RouteGraph(tcatalogue::TransportCatalogue & db, const domain::RoutingSettings & routing_settings)
     : db_(db)
-    , routing_settings_(domain::Settings::instance().routing_settings.value())
+    , routing_settings_(routing_settings)
     , current_vertex_id_(0)
     , graph_(db.StopCount() * 2)
 {}

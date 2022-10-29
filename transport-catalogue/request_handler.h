@@ -18,7 +18,8 @@ class RequestHandler {
 
 public:
     RequestHandler(tcatalogue::TransportCatalogue & db,
-                   renderer::MapRenderer & drawer);
+                   renderer::MapRenderer & drawer,
+                   const domain::RoutingSettings &routing_settings);
 
     const domain::Bus& GetBus(domain::BusId id) const;
 

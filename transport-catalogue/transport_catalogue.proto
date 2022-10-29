@@ -46,8 +46,14 @@ message RenderSettings {
     repeated Color color_palette = 12;
 };
 
+message RoutingSettings {
+    required double bus_velocity = 1;
+    required double bus_wait_time = 2;
+}
+
 message Catalogue {
     repeated Stop stops = 1;
     repeated Bus  buses = 2;
     optional RenderSettings render_settings = 3;
+    optional RoutingSettings routing_settings = 4;
 }

@@ -6,11 +6,10 @@
 #include <cassert>
 #include <fstream>
 
-const std::string& Serialization::GetFilePath() {
-    const auto & ref_settings = domain::Settings::instance().serialize_settings;
-    assert(ref_settings.has_value());
-    assert(!ref_settings.value().file.empty());
-    return ref_settings.value().file;
+const std::string& Serialization::GetFilePath(const Context &ctx) {
+    assert(ctx.serialize_settings.has_value());
+    assert(!ctx.serialize_settings.value().file.empty());
+    return ctx.serialize_settings.value().file;
 }
 
 void svgColorSerialize(const svg::Color & in_color,
@@ -78,6 +77,13 @@ void Serialization::Write(const Context & context) {
             pbBus->add_stops(stop_name);
         }
     }
+    // routing settings
+    if (context.routing_settings.has_value()) {
+        const auto & rs = context.routing_settings.value();
+        ::transport_catalogue_pb::RoutingSettings* pbRS = cat.mutable_routing_settings();
+        pbRS->set_bus_velocity(rs.bus_velocity);
+        pbRS->set_bus_wait_time(rs.bus_wait_time);
+    }
     // render settings
     if (context.render_settings.has_value()) {
         const auto & rs = context.render_settings.value();
@@ -107,13 +113,13 @@ void Serialization::Write(const Context & context) {
     }
 
     // output to file stream
-    std::ofstream output_file(GetFilePath(), std::ios::binary);
+    std::ofstream output_file(GetFilePath(context), std::ios::binary);
     cat.SerializeToOstream(&output_file);
 }
 
 bool Serialization::Read(Context & context) {
     // input from file stream
-    std::ifstream input_file(GetFilePath(), std::ios::binary);
+    std::ifstream input_file(GetFilePath(context), std::ios::binary);
 
     ::transport_catalogue_pb::Catalogue cat;
     if (!cat.ParseFromIstream(&input_file)) {
@@ -146,6 +152,15 @@ bool Serialization::Read(Context & context) {
             bus.stops_.emplace_back(stop_name);
         }
         context.busses.emplace_back(std::move(bus));
+    }
+
+    // routing settings
+    if (cat.has_routing_settings()) {
+        const auto & pbRS = cat.routing_settings();
+        domain::RoutingSettings routing_settings;
+        routing_settings.bus_velocity = pbRS.bus_velocity();
+        routing_settings.bus_wait_time = pbRS.bus_wait_time();
+        context.routing_settings = std::move(routing_settings);
     }
 
     // render settings

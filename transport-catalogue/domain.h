@@ -27,20 +27,6 @@ struct RoutingSettings {
     double bus_wait_time;
 };
 
-class Settings {
-private:
-    Settings() {}
-
-public:
-    std::optional<RoutingSettings> routing_settings;
-    std::optional<SerializeSettings> serialize_settings;
-
-    static Settings& instance();
-
-    Settings(const Settings &) = delete;
-    Settings& operator=(const Settings &) = delete;
-};
-
 struct Stop {
     std::string name;
     geo::Coordinates coordinates;

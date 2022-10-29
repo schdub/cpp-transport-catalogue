@@ -87,14 +87,13 @@ int ProcessRequests() {
         return EXIT_FAILURE;
     }
 
-    domain::Settings& ref_settings = domain::Settings::instance();
-    ref_settings.serialize_settings = reader.ParseSerializeSettings();
-    if (!ref_settings.serialize_settings.has_value()) {
+    Serialization::Context context;
+    context.serialize_settings = reader.ParseSerializeSettings();
+    if (!context.serialize_settings.has_value()) {
         // WARN() << "can't parse serialize_settings!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    Serialization::Context context;
     TransportCatalogue db; {
         if (!Serialization::Read(context)) {
             // WARN() << "can't parse serialized database!" << std::endl;
@@ -103,16 +102,6 @@ int ProcessRequests() {
         FillDatabase(db, context.stops, context.busses);
     }
 
-#if 1
-    ref_settings.routing_settings = domain::RoutingSettings();
-#else
-    ref_settings.routing_settings = reader.ParseRoutingSettings();
-    if (!ref_settings.routing_settings.has_value()) {
-        // WARN() << "can't parse routing_settings!" << std::endl;
-        return EXIT_FAILURE;
-    }
-#endif
-
     STAT_RESPONSES responses; {
         STAT_REQUESTS stat_requests;
         reader.ParseStatRequests(stat_requests);
@@ -120,7 +109,7 @@ int ProcessRequests() {
             //LOG() << "stat_requests is empty." << std::endl;
         } else {
             renderer::MapRenderer drawer(context.render_settings.value());
-            RequestHandler handler(db, drawer);
+            RequestHandler handler(db, drawer, context.routing_settings.value());
             FillStatResponses(handler, stat_requests, responses);
         }
     }
@@ -149,17 +138,22 @@ int MakeBase() {
         return EXIT_FAILURE;
     }
 
-    domain::Settings& ref_settings = domain::Settings::instance();
-    ref_settings.serialize_settings = reader.ParseSerializeSettings();
-    if (!ref_settings.serialize_settings.has_value()) {
+    Serialization::Context context;
+    context.serialize_settings = reader.ParseSerializeSettings();
+    if (!context.serialize_settings.has_value()) {
         // WARN() << "can't parse serialize_settings!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    Serialization::Context context;
     context.render_settings = reader.ParseRenderSettings();
     if (!context.render_settings.has_value()) {
         // WARN() << "can't parse render_settings!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    context.routing_settings = reader.ParseRoutingSettings();
+    if (!context.routing_settings.has_value()) {
+        // WARN() << "can't parse routing_settings!" << std::endl;
         return EXIT_FAILURE;
     }
 
